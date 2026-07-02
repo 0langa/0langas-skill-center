@@ -1,0 +1,24 @@
+{
+  "skill_name": "official-docs-first",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm making this repo work in Codex and Claude Code. Add the right persistent instruction files and include the config pieces for MCP without guessing the syntax.",
+      "expected_output": "The agent should activate the skill, consult Codex and Claude Code official docs before editing, and separate provider-specific files and syntax.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Can you wire Kimi Code into my Claude Code setup? I think it uses an OpenAI-ish endpoint but please just make it work.",
+      "expected_output": "The agent should activate the skill, check Kimi Code official docs for the current endpoint/model guidance and Claude Code docs for provider setup before recommending or editing configuration.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Create a reusable plugin that works for codex, claude code, and kimi-code. Include hooks, skills, and any connector metadata those clients expect.",
+      "expected_output": "The agent should activate the skill, verify each provider's official plugin/skill/hook documentation independently, and avoid inventing a shared plugin shape where docs do not support one.",
+      "files": []
+    }
+  ]
+}
+
