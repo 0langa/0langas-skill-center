@@ -21,18 +21,18 @@ This repo is intended to grow into a broader skill center, not a single-purpose 
 
 ## Candidate Skills
 
-These are high-value autoactivating skills that would fit this collection:
+These are workflow-specific, autoactivating skills that would fit this collection:
 
-- `repo-intake-map`: activate in unfamiliar repos; build a concise project map, commands list, ownership boundaries, and risk notes before edits.
-- `failure-loop`: activate on failing tests/builds/CI; reproduce, isolate, fix, rerun, and record failure evidence.
-- `docs-truth-guard`: activate when editing docs; verify README/API/docs claims against code, commands, and current behavior.
-- `config-schema-sentinel`: activate when touching config files; find official schema/docs, validate syntax, and avoid invented keys.
-- `dependency-upgrade-sherpa`: activate for dependency bumps; read changelogs, apply narrow updates, run compatibility checks, and document breaking changes.
-- `secret-hygiene`: activate around `.env`, auth, keys, logs, and config; prevent leaks and suggest safe local handling.
-- `release-note-crafter`: activate near version bumps, changelogs, tags, or PR wrap-up; produce concise user-facing release notes from diffs.
-- `test-gap-finder`: activate after bug fixes or behavior changes; identify missing regression coverage and add focused tests.
-- `pr-review-hardener`: activate before push/PR; inspect diff like a reviewer for regressions, missing tests, risky behavior, and sloppy docs.
-- `cross-agent-handoff`: activate when work may move between Codex, Claude Code, and Kimi Code; write portable state, commands, decisions, and next steps.
+- `skill-center-curator`: activate when working in this repo; enforce the canonical top-level skill folder plus `.codex`, `.claude`, and `.kimi-code` symlink layout, update README tables, validate frontmatter across providers, and optionally link Codex user-home installs.
+- `tri-client-skill-port`: activate when importing or writing a skill meant for Codex, Claude Code, and Kimi Code; add compatible metadata, normalize trigger descriptions, preserve client-specific fields, and check official docs before claiming discovery behavior.
+- `skill-trigger-evalsmith`: activate when a skill's trigger behavior matters; generate realistic should-trigger and should-not-trigger prompts, store eval sets beside the skill, and tune the frontmatter description without making it keyword spam.
+- `agent-install-sync`: activate after adding or renaming a skill; reconcile repo symlinks, `~/.codex/skills`, `.claude/skills`, `.kimi-code/skills`, and any installed `.agents` source without duplicating canonical content.
+- `official-docs-citation-cache`: activate when repeated official-docs lookups are needed; fetch provider docs indexes, cache source URLs and exact sections, and leave compact evidence notes usable by future agents.
+- `recall-memory-hygiene`: activate when a durable lesson, repo convention, or recurring failure appears; decide whether it belongs in Recall, README, skill instructions, or repo config, then save only reusable signal.
+- `addon-archive-miner`: activate when you mention looking for new addons, skills, plugins, or automation ideas; search the local addon archive for gaps, avoid duplicates of installed skills, and propose only workflow-specific candidates.
+- `handoff-cck-bridge`: activate when work crosses Codex, Claude Code, and Kimi Code; write handoffs that include current repo state, command history, docs checked, symlink/install assumptions, and next safe actions.
+- `windows-agent-pathguard`: activate when editing installs, symlinks, PATH, PowerShell commands, or Windows-local agent setup; verify absolute paths, avoid fragile shell mixing, and keep user-home versus repo-local installs explicit.
+- `skill-release-publisher`: activate when a skill is ready to publish; verify public-safe content, update repo description/README, commit with clean history, push, and prepare a compact release note or install snippet.
 
 ## Install Notes
 
