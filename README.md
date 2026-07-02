@@ -32,7 +32,7 @@ Run the repo E2E checks after adding, renaming, moving, or publishing skills:
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\skill-center.e2e.ps1
 ```
 
-The test verifies required skill frontmatter, JSON eval files, trigger-eval coverage, provider symlink resolution, Codex user-level install links, README catalog coverage, official docs cache records, and the intended dependency order between these five workflow skills.
+The test verifies required skill frontmatter, JSON eval files, trigger-eval coverage, provider symlink resolution, user-level install links for Codex, Claude Code, and Kimi Code, README catalog coverage, official docs cache records, and the intended dependency order between these five workflow skills.
 
 ## Candidate Skills
 

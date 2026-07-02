@@ -1,7 +1,17 @@
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$Skills = @(
+$WorkflowSkills = @(
+  "official-docs-citation-cache",
+  "tri-client-skill-port",
+  "skill-trigger-evalsmith",
+  "agent-install-sync",
+  "skill-center-curator"
+)
+
+$InstalledSkills = @(
+  "official-ai-devdocs",
+  "muteman",
   "official-docs-citation-cache",
   "tri-client-skill-port",
   "skill-trigger-evalsmith",
@@ -13,6 +23,12 @@ $ProviderRoots = @(
   ".codex\skills",
   ".claude\skills",
   ".kimi-code\skills"
+)
+
+$UserInstallRoots = @(
+  "$HOME\.codex\skills",
+  "$HOME\.claude\skills",
+  "$HOME\.kimi-code\skills"
 )
 
 $Failures = New-Object System.Collections.Generic.List[string]
@@ -112,26 +128,29 @@ function Test-ProviderLink {
   }
 }
 
-function Test-UserCodexLink {
-  param([string]$Skill)
+function Test-UserSkillLink {
+  param(
+    [string]$Skill,
+    [string]$Root
+  )
 
-  $linkPath = Join-Path "$HOME\.codex\skills" $Skill
+  $linkPath = Join-Path $Root $Skill
   $expected = (Resolve-Path -LiteralPath (Join-Path $RepoRoot $Skill)).Path
 
   if (-not (Test-Path -LiteralPath $linkPath)) {
-    Add-Failure "Missing user Codex skill link: $linkPath"
+    Add-Failure "Missing user skill link: $linkPath"
     return
   }
 
   $item = Get-Item -LiteralPath $linkPath -Force
   if ($item.LinkType -ne "SymbolicLink" -and $item.LinkType -ne "Junction") {
-    Add-Failure "User Codex entry is not a symlink or junction: $linkPath"
+    Add-Failure "User skill entry is not a symlink or junction: $linkPath"
     return
   }
 
   $resolved = Resolve-LinkTarget $item
   if ($resolved -ne $expected) {
-    Add-Failure "User Codex link target mismatch: $linkPath -> $resolved expected $expected"
+    Add-Failure "User skill link target mismatch: $linkPath -> $resolved expected $expected"
   }
 }
 
@@ -169,7 +188,7 @@ function Test-TriggerEvals {
 $RequiredFields = @("name", "description", "when_to_use", "type", "whenToUse", "disableModelInvocation")
 $Readme = Get-Content -LiteralPath (Join-Path $RepoRoot "README.md") -Raw
 
-foreach ($skill in $Skills) {
+foreach ($skill in $WorkflowSkills) {
   $skillDir = Join-Path $RepoRoot $skill
   $skillPath = Join-Path $skillDir "SKILL.md"
 
@@ -219,12 +238,6 @@ foreach ($skill in $Skills) {
     Test-TriggerEvals $skill (Read-JsonFile $triggerPath)
   }
 
-  foreach ($root in $ProviderRoots) {
-    Test-ProviderLink $skill $root
-  }
-
-  Test-UserCodexLink $skill
-
   $readmeRowNeedle = "| ``$skill`` |"
   if ($Readme -notmatch [regex]::Escape($readmeRowNeedle)) {
     Add-Failure "README skill table missing row for $skill"
@@ -233,6 +246,16 @@ foreach ($skill in $Skills) {
   $candidateNeedle = "- ``$skill``:"
   if ($Readme -match [regex]::Escape($candidateNeedle)) {
     Add-Failure "README still lists implemented skill as candidate: $skill"
+  }
+}
+
+foreach ($skill in $InstalledSkills) {
+  foreach ($root in $ProviderRoots) {
+    Test-ProviderLink $skill $root
+  }
+
+  foreach ($root in $UserInstallRoots) {
+    Test-UserSkillLink $skill $root
   }
 }
 
@@ -283,4 +306,4 @@ if ($Failures.Count -gt 0) {
   exit 1
 }
 
-Write-Host "skill-center E2E passed for $($Skills.Count) skills." -ForegroundColor Green
+Write-Host "skill-center E2E passed for $($WorkflowSkills.Count) workflow skills and $($InstalledSkills.Count) installed skills." -ForegroundColor Green
