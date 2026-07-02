@@ -9,7 +9,7 @@ This repo is intended to grow into a broader skill center, not a single-purpose 
 - Top-level skill folders, such as `official-ai-devdocs/`, are the canonical source directories.
 - `.claude/skills/` exposes compatible skills to Claude Code.
 - `.kimi-code/skills/` exposes compatible skills to Kimi Code.
-- `.codex/skills/` keeps Codex-facing skills grouped with other Codex project files. Current Codex docs list `.agents/skills` as the official repo auto-discovery path, so this folder is an organized source/mirror unless your Codex setup explicitly supports or installs from it.
+- `.codex/skills/` keeps Codex-facing skills grouped with other Codex project files.
 - Provider discovery directories may use symlinks back to the canonical top-level skill folder to avoid duplicate copies.
 
 ## Skills
@@ -26,4 +26,4 @@ For project-local discovery:
 
 - Claude Code: keep `.claude/skills/official-ai-devdocs`.
 - Kimi Code: keep `.kimi-code/skills/official-ai-devdocs`.
-- Codex: use the canonical `official-ai-devdocs/` folder or `.codex/skills/official-ai-devdocs` as the clean source, then install or symlink it into a Codex-supported skills location if your Codex version still requires `.agents/skills`.
+- Codex: keep `.codex/skills/official-ai-devdocs` for clean provider-specific organization. For user-wide discovery in Codex, install or symlink the canonical skill into your Codex skills home, for example `~/.codex/skills/official-ai-devdocs`.

@@ -39,7 +39,7 @@ For Claude Code, first fetch or inspect `https://code.claude.com/docs/llms.txt` 
 
 This skill is written as a directory-form `SKILL.md` skill with YAML frontmatter and Markdown instructions so it is usable by Codex, Claude Code, and Kimi Code.
 
-- Codex uses `name` and `description`. Official Codex repo skill discovery currently scans `.agents/skills`; this repository also keeps a `.codex/skills` mirror for clean provider-specific organization, but do not assume Codex auto-discovers that path unless current Codex docs say so.
+- Codex uses `name` and `description`. This repository keeps Codex-facing skills under `.codex/skills` for clean provider-specific organization. For user-wide Codex discovery, install or symlink the canonical skill into the Codex skills home, such as `~/.codex/skills`.
 - Claude Code uses `description` and optional `when_to_use`, and discovers project skills from `.claude/skills`.
 - Kimi Code uses `name`, `description`, `type`, `whenToUse`, and `disableModelInvocation`, and discovers project skills from `.kimi-code/skills`.
 
