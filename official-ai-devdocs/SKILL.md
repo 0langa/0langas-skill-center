@@ -1,9 +1,13 @@
 ---
-name: official-docs-first
-description: Use automatically whenever a task involves Codex, Claude Code, Kimi Code, or projects meant to work across multiple AI coding clients. This skill is required for any question or code change involving provider configuration, config syntax, plugins, skills, connectors, MCP servers, hooks, subagents, memory/instructions files, auth setup, environment variables, CLI commands, IDE/desktop/web surfaces, model/provider routing, migrations, or compatibility between Codex, Claude Code, and Kimi Code. Use it even when the user does not explicitly ask for documentation, because official docs should be checked before guessing provider-specific shapes or behavior.
+name: official-ai-devdocs
+description: Official documentation first for Codex, Claude Code, Kimi Code, and projects meant to work across multiple AI coding clients. Use automatically for provider configuration, config syntax, plugins, skills, connectors, MCP servers, hooks, subagents, memory/instruction files, auth setup, environment variables, CLI commands, IDE/desktop/web surfaces, model/provider routing, migrations, or compatibility between Codex, Claude Code, and Kimi Code. Check official docs before guessing provider-specific shapes or behavior.
+when_to_use: When the user asks about or edits anything provider-specific for Codex, Claude Code, Kimi Code, or shared AI-agent project setup; when official provider docs could prevent stale or invented syntax; when comparing or translating concepts between the three clients.
+type: prompt
+whenToUse: When the user asks about or edits anything provider-specific for Codex, Claude Code, Kimi Code, or shared AI-agent project setup; when official provider docs could prevent stale or invented syntax; when comparing or translating concepts between the three clients.
+disableModelInvocation: false
 ---
 
-# Official Docs First
+# Official AI Devdocs
 
 Use this skill to keep multi-client agent projects grounded in current provider documentation. The goal is simple: when provider behavior, syntax, setup, or compatibility can be looked up, verify it from the official docs before answering or editing files.
 
@@ -30,6 +34,16 @@ Use these entry points and then navigate to the most specific page for the task.
 | Kimi Code | `https://www.kimi.com/code/docs/en/` | Kimi Code CLI/VS Code behavior, configuration files, providers/models, overrides, environment variables, MCP, skills, plugins, agents, hooks, third-party coding-agent setup |
 
 For Claude Code, first fetch or inspect `https://code.claude.com/docs/llms.txt` when possible. The overview page points to that file as the complete documentation index, and it is the best way to discover the current page to read next.
+
+## Discovery Compatibility
+
+This skill is written as a directory-form `SKILL.md` skill with YAML frontmatter and Markdown instructions so it is usable by Codex, Claude Code, and Kimi Code.
+
+- Codex uses `name` and `description`, and discovers repo skills from `.agents/skills`.
+- Claude Code uses `description` and optional `when_to_use`, and discovers project skills from `.claude/skills`.
+- Kimi Code uses `name`, `description`, `type`, `whenToUse`, and `disableModelInvocation`, and discovers project skills from `.agents/skills` and `.kimi-code/skills`.
+
+Keep the canonical copy in this repository's top-level `official-ai-devdocs/` directory. Provider discovery directories may symlink to it so the skill stays in one place.
 
 ## Lookup Workflow
 
@@ -97,4 +111,3 @@ If you cannot reach the official docs:
 2. Use local CLI help only for installed-version behavior.
 3. Tell the user exactly which docs could not be reached.
 4. Avoid changing provider-specific syntax unless the repo already contains a working example or the user confirms the intended shape.
-

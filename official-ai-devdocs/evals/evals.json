@@ -1,5 +1,5 @@
 {
-  "skill_name": "official-docs-first",
+  "skill_name": "official-ai-devdocs",
   "evals": [
     {
       "id": 1,
@@ -21,4 +21,3 @@
     }
   ]
 }
-
