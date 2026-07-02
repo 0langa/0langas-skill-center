@@ -1,0 +1,50 @@
+[
+  {
+    "id": "T001",
+    "query": "We checked the Kimi skill docs and Claude skill docs for discovery paths. Save the official citations so the next agent can reuse them.",
+    "should_trigger": true,
+    "reason": "The user explicitly wants official docs evidence cached for future provider work.",
+    "competing_skills": ["official-ai-devdocs"],
+    "expected_routing": "Use official-ai-devdocs for lookup if needed, then cache compact evidence notes."
+  },
+  {
+    "id": "T002",
+    "query": "Before claiming .codex/skills works, check whether we already have a cached official Codex source for skill discovery.",
+    "should_trigger": true,
+    "reason": "The task asks to reuse cached official documentation evidence for a provider discovery claim.",
+    "competing_skills": ["tri-client-skill-port"],
+    "expected_routing": "Inspect the cache first, refresh official docs if stale, then return source-linked claims."
+  },
+  {
+    "id": "T003",
+    "query": "The docs did not confirm that marketplace shape. Record that negative finding so future plugin work does not guess.",
+    "should_trigger": true,
+    "reason": "Negative official-docs findings are part of the cache contract.",
+    "competing_skills": [],
+    "expected_routing": "Create or update a cache note that marks the unsupported claim clearly."
+  },
+  {
+    "id": "N001",
+    "query": "Look up the latest Codex plugin documentation and tell me the correct manifest schema.",
+    "should_trigger": false,
+    "reason": "The primary task is official docs lookup, not caching the evidence afterward.",
+    "competing_skills": ["official-ai-devdocs"],
+    "expected_routing": "Use official-ai-devdocs first; this skill may be used only after evidence should be saved."
+  },
+  {
+    "id": "N002",
+    "query": "Rewrite this README section to be clearer and shorter.",
+    "should_trigger": false,
+    "reason": "General documentation editing does not involve provider-doc evidence caching.",
+    "competing_skills": ["docs-truth-sync"],
+    "expected_routing": "Route to general docs editing or repo documentation skills."
+  },
+  {
+    "id": "N003",
+    "query": "Make a new skill that evaluates trigger behavior for my existing skills.",
+    "should_trigger": false,
+    "reason": "Trigger eval generation is owned by skill-trigger-evalsmith.",
+    "competing_skills": ["skill-trigger-evalsmith"],
+    "expected_routing": "Use skill-trigger-evalsmith; cache docs only if provider docs are consulted."
+  }
+]

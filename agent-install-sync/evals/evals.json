@@ -1,0 +1,24 @@
+{
+  "skill_name": "agent-install-sync",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I just added skill-trigger-evalsmith. Make sure Codex, Claude Code, and Kimi Code can all see it from this repo without copying the skill three times.",
+      "expected_output": "Checks canonical SKILL.md, creates or repairs provider links, and reports user-level install options without duplicating content.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I renamed a skill but now it appears under both the old and new names in some clients. Sync the install state safely.",
+      "expected_output": "Inventories old/new names, classifies duplicates or conflicts, repairs links, and avoids deleting real directories without explicit confirmation.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Check if my .agents copy of official-ai-devdocs is making duplicates now that we use .codex and .kimi-code folders.",
+      "expected_output": "Inspects legacy .agents roots, compares content with canonical source, and reports safe cleanup options without automatic destructive deletion.",
+      "files": []
+    }
+  ]
+}
+

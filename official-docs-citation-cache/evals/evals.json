@@ -1,0 +1,24 @@
+{
+  "skill_name": "official-docs-citation-cache",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We checked Codex and Kimi docs for skill discovery while adding a repo skill. Save the docs evidence so the next agent doesn't have to look it up again.",
+      "expected_output": "Creates or updates a compact official-docs cache note with provider, topic, checked date, source URLs, supported claims, freshness, and used_by metadata.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Before we update marketplace instructions again, see whether we already cached the official docs citation from last week and refresh it if stale.",
+      "expected_output": "Checks the cache index, applies freshness rules, refreshes official docs only when needed, and reports the reused or updated note.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "The docs did not actually say .codex/skills is auto-scanned. Cache that negative finding so we stop overclaiming it.",
+      "expected_output": "Records a negative official-docs finding with sources, scope, and a warning not to assert unsupported discovery behavior.",
+      "files": []
+    }
+  ]
+}
+

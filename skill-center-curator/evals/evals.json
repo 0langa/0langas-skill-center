@@ -1,0 +1,24 @@
+{
+  "skill_name": "skill-center-curator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a new skill to 0langas-skill-center, make it work in Codex, Claude Code, and Kimi Code, add trigger evals, update the README, sync links, and run checks.",
+      "expected_output": "Orchestrates docs cache, tri-client porting, trigger evals, install sync, README update, and deterministic validation.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I renamed a skill and the repo is messy now. Curate the skill center so the old name is gone, the new one is documented, and all provider links are correct.",
+      "expected_output": "Inspects git state, applies rename policy, repairs provider links, updates eval metadata and README, and reports any user-level install conflicts.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Before I publish these skills, do a full skill-center readiness pass.",
+      "expected_output": "Runs checks for frontmatter, links, evals, README, docs cache, and install state, then reports commit/release readiness.",
+      "files": []
+    }
+  ]
+}
+

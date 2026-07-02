@@ -1,0 +1,50 @@
+[
+  {
+    "id": "T001",
+    "query": "I added tri-client-skill-port. Link it into .codex, .claude, .kimi-code, and my user Codex skills without copying it.",
+    "should_trigger": true,
+    "reason": "The task is syncing provider discovery and user-level install links.",
+    "competing_skills": ["tri-client-skill-port"],
+    "expected_routing": "Verify canonical source, create or repair links, and report duplicates."
+  },
+  {
+    "id": "T002",
+    "query": "Why does @ show both the .agents and .codex copy of this skill? Clean up the install state safely.",
+    "should_trigger": true,
+    "reason": "The user reports duplicate skill visibility caused by overlapping install roots.",
+    "competing_skills": ["customization-control:customization-dedupe"],
+    "expected_routing": "Inventory duplicates and propose or apply safe link repairs without deleting real content."
+  },
+  {
+    "id": "T003",
+    "query": "After renaming official-docs-cache, make sure all provider skill folders point at the new canonical directory.",
+    "should_trigger": true,
+    "reason": "Rename-driven discovery link repair is in scope.",
+    "competing_skills": ["skill-center-curator"],
+    "expected_routing": "Check old and new links, resolve targets, and repair only safe symlinks."
+  },
+  {
+    "id": "N001",
+    "query": "Rewrite this skill so it has Kimi whenToUse frontmatter.",
+    "should_trigger": false,
+    "reason": "Frontmatter porting belongs to tri-client-skill-port.",
+    "competing_skills": ["tri-client-skill-port"],
+    "expected_routing": "Use tri-client-skill-port before install sync."
+  },
+  {
+    "id": "N002",
+    "query": "Publish this completed skill to GitHub and write release notes.",
+    "should_trigger": false,
+    "reason": "Publishing is outside install sync unless links are broken.",
+    "competing_skills": ["skill-release-publisher", "skill-center-curator"],
+    "expected_routing": "Use a publisher or curator skill."
+  },
+  {
+    "id": "N003",
+    "query": "Design prompts to test whether this skill overtriggers.",
+    "should_trigger": false,
+    "reason": "Activation prompt generation belongs to skill-trigger-evalsmith.",
+    "competing_skills": ["skill-trigger-evalsmith"],
+    "expected_routing": "Use skill-trigger-evalsmith."
+  }
+]

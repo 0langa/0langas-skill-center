@@ -1,0 +1,50 @@
+[
+  {
+    "id": "T001",
+    "query": "Port this Codex skill so Claude Code and Kimi Code discover it too, but keep one canonical SKILL.md.",
+    "should_trigger": true,
+    "reason": "The user asks for cross-client skill compatibility and canonical layout.",
+    "competing_skills": ["agent-install-sync"],
+    "expected_routing": "Normalize frontmatter and layout first; install sync can repair links afterward."
+  },
+  {
+    "id": "T002",
+    "query": "I have copies of the same skill in .claude and .kimi-code with different metadata. Make one tri-client version.",
+    "should_trigger": true,
+    "reason": "Provider-specific copies drifted and need a tri-client canonical source.",
+    "competing_skills": ["skill-center-curator"],
+    "expected_routing": "Diff copies, preserve behavior, normalize metadata, then link provider folders."
+  },
+  {
+    "id": "T003",
+    "query": "Add whenToUse and disableModelInvocation where appropriate so this skill works cleanly in Kimi without breaking Codex.",
+    "should_trigger": true,
+    "reason": "The task is about provider-compatible SKILL.md frontmatter.",
+    "competing_skills": ["official-docs-citation-cache"],
+    "expected_routing": "Verify docs evidence for metadata claims and update the canonical SKILL.md."
+  },
+  {
+    "id": "N001",
+    "query": "The skill is already ported. Just recreate the missing .codex and .claude symlinks.",
+    "should_trigger": false,
+    "reason": "The requested operation is link repair, not porting.",
+    "competing_skills": ["agent-install-sync"],
+    "expected_routing": "Use agent-install-sync to repair discovery links."
+  },
+  {
+    "id": "N002",
+    "query": "Generate realistic should-trigger and should-not-trigger prompts for this skill.",
+    "should_trigger": false,
+    "reason": "Activation eval creation is owned by skill-trigger-evalsmith.",
+    "competing_skills": ["skill-trigger-evalsmith"],
+    "expected_routing": "Use skill-trigger-evalsmith."
+  },
+  {
+    "id": "N003",
+    "query": "Check the latest Claude Code docs before we decide whether symlinks are supported.",
+    "should_trigger": false,
+    "reason": "The task is official docs lookup, not porting a skill yet.",
+    "competing_skills": ["official-ai-devdocs"],
+    "expected_routing": "Use official-ai-devdocs and optionally cache with official-docs-citation-cache."
+  }
+]

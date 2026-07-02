@@ -1,0 +1,50 @@
+[
+  {
+    "id": "T001",
+    "query": "Add these five skills to 0langas-skill-center, make them tri-client, add evals, update README, sync links, and test everything.",
+    "should_trigger": true,
+    "reason": "This is a full skill-center orchestration request.",
+    "competing_skills": ["skill-creator", "tri-client-skill-port", "agent-install-sync"],
+    "expected_routing": "Run the curator order across docs cache, porting, evals, sync, README, and tests."
+  },
+  {
+    "id": "T002",
+    "query": "I renamed a skill and now the repo has old candidates, broken symlinks, and stale eval names. Curate it.",
+    "should_trigger": true,
+    "reason": "The user asks for multi-surface repo cleanup across docs, links, and evals.",
+    "competing_skills": ["agent-install-sync"],
+    "expected_routing": "Use curator as orchestrator and agent-install-sync for the link portion."
+  },
+  {
+    "id": "T003",
+    "query": "Before pushing this skill-center change, run the readiness pass for README, provider links, docs cache, and trigger evals.",
+    "should_trigger": true,
+    "reason": "Pre-publish skill-center readiness is the curator's final-pass responsibility.",
+    "competing_skills": [],
+    "expected_routing": "Run deterministic validation and report commit readiness."
+  },
+  {
+    "id": "N001",
+    "query": "Only fix the missing ~/.codex/skills symlink for muteman.",
+    "should_trigger": false,
+    "reason": "A narrow install repair should route directly to agent-install-sync.",
+    "competing_skills": ["agent-install-sync"],
+    "expected_routing": "Use agent-install-sync."
+  },
+  {
+    "id": "N002",
+    "query": "Create trigger eval prompts for one existing skill.",
+    "should_trigger": false,
+    "reason": "A narrow eval-only request belongs to skill-trigger-evalsmith.",
+    "competing_skills": ["skill-trigger-evalsmith"],
+    "expected_routing": "Use skill-trigger-evalsmith."
+  },
+  {
+    "id": "N003",
+    "query": "Look up the latest Kimi Code docs for plugin configuration.",
+    "should_trigger": false,
+    "reason": "Provider docs lookup alone belongs to official-ai-devdocs.",
+    "competing_skills": ["official-ai-devdocs"],
+    "expected_routing": "Use official-ai-devdocs and cache evidence only if useful."
+  }
+]

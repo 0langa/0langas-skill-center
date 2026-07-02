@@ -1,0 +1,24 @@
+{
+  "skill_name": "skill-trigger-evalsmith",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create activation tests for tri-client-skill-port. Include near misses where official-ai-devdocs or agent-install-sync should win instead.",
+      "expected_output": "Generates trigger-evals.json with realistic should-trigger and should-not-trigger prompts, competing skill notes, and routing expectations.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "This skill overtriggers whenever I mention docs. Build eval prompts that prove the description needs a tighter boundary.",
+      "expected_output": "Creates negative cases around adjacent docs tasks and recommends description changes that reduce overtriggering.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I renamed a skill and now I don't know if agents will still auto-load it. Make a trigger test set before I publish.",
+      "expected_output": "Creates a realistic activation suite for the renamed skill and calls out frontmatter fields to inspect.",
+      "files": []
+    }
+  ]
+}
+

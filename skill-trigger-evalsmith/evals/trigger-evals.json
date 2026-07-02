@@ -1,0 +1,50 @@
+[
+  {
+    "id": "T001",
+    "query": "Build activation tests for agent-install-sync with near misses where tri-client-skill-port should win.",
+    "should_trigger": true,
+    "reason": "The user asks for realistic activation tests with competing-skill routing.",
+    "competing_skills": ["agent-install-sync", "tri-client-skill-port"],
+    "expected_routing": "Create trigger-evals.json with positive, negative, and competing-skill cases."
+  },
+  {
+    "id": "T002",
+    "query": "This skill fires every time I say docs. Make eval prompts that prove the description is too broad.",
+    "should_trigger": true,
+    "reason": "The task is to evaluate and tune activation boundaries.",
+    "competing_skills": [],
+    "expected_routing": "Generate near-miss negatives and recommend tighter trigger language."
+  },
+  {
+    "id": "T003",
+    "query": "Before publishing this renamed skill, test whether agents would auto-load it for the right prompts.",
+    "should_trigger": true,
+    "reason": "Pre-publish activation quality is the skill's core purpose.",
+    "competing_skills": ["skill-center-curator"],
+    "expected_routing": "Create trigger evals and flag metadata changes needed for autoactivation."
+  },
+  {
+    "id": "N001",
+    "query": "Create a new skill folder and write its SKILL.md.",
+    "should_trigger": false,
+    "reason": "Skill creation is broader than activation eval generation.",
+    "competing_skills": ["skill-creator", "skill-center-curator"],
+    "expected_routing": "Use skill-creator or skill-center-curator, then this skill only for activation evals."
+  },
+  {
+    "id": "N002",
+    "query": "Fix the broken ~/.codex/skills symlink for muteman.",
+    "should_trigger": false,
+    "reason": "Install link repair belongs to agent-install-sync.",
+    "competing_skills": ["agent-install-sync"],
+    "expected_routing": "Use agent-install-sync."
+  },
+  {
+    "id": "N003",
+    "query": "Cache the Codex docs citation we used for plugin manifests.",
+    "should_trigger": false,
+    "reason": "Official docs evidence caching is a different task.",
+    "competing_skills": ["official-docs-citation-cache"],
+    "expected_routing": "Use official-docs-citation-cache."
+  }
+]

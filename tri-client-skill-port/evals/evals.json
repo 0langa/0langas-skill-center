@@ -1,0 +1,24 @@
+{
+  "skill_name": "tri-client-skill-port",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Import this existing Codex skill into 0langas-skill-center and make it work for Claude Code and Kimi too without duplicating copies.",
+      "expected_output": "Chooses a canonical top-level skill directory, normalizes cross-client frontmatter, creates provider links, and records docs evidence for discovery claims.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The Claude version and Kimi version of this skill drifted. Make one canonical tri-client skill and keep provider-specific behavior intact.",
+      "expected_output": "Diffs provider copies, preserves real behavior, normalizes metadata, and reports conflicts instead of blindly overwriting.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Rename skill-trigger-helper to skill-trigger-evalsmith and make sure all three providers discover the new name.",
+      "expected_output": "Renames canonical directory/frontmatter, updates provider links and eval metadata, and verifies discovery paths without overclaiming unsupported docs.",
+      "files": []
+    }
+  ]
+}
+

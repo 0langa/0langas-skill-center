@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "updated_at": "2026-07-02",
+  "notes": [
+    {
+      "provider": "codex",
+      "topic": "skill-discovery",
+      "path": ".ai/official-docs-cache/notes/codex-skill-discovery.md",
+      "checked_at": "2026-07-02",
+      "stability": "likely-changing",
+      "sources": ["https://developers.openai.com/codex/skills"]
+    },
+    {
+      "provider": "claude-code",
+      "topic": "skill-discovery",
+      "path": ".ai/official-docs-cache/notes/claude-code-skill-discovery.md",
+      "checked_at": "2026-07-02",
+      "stability": "likely-changing",
+      "sources": ["https://code.claude.com/docs/en/skills"]
+    },
+    {
+      "provider": "kimi-code",
+      "topic": "skill-discovery",
+      "path": ".ai/official-docs-cache/notes/kimi-code-skill-discovery.md",
+      "checked_at": "2026-07-02",
+      "stability": "likely-changing",
+      "sources": ["https://www.kimi.com/code/docs/en/kimi-code-cli/customization/skills.html"]
+    }
+  ]
+}
+
