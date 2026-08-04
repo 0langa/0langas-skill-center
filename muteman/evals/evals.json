@@ -1,0 +1,23 @@
+{
+  "skill_name": "muteman",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "mute. big refactor ahead, just work.",
+      "expected_output": "Activates the emoji-only protocol: near-zero chat, work proceeds silently with only protocol emojis as status until told to stop.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "No status updates for this session please, I'll read the diff at the end.",
+      "expected_output": "Enters muteman mode without needing the literal keyword; acknowledges per protocol and stays quiet through the turn.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Explain step by step how you would optimize this query.",
+      "expected_output": "Should NOT trigger muteman; the user explicitly wants verbose explanation.",
+      "files": []
+    }
+  ]
+}

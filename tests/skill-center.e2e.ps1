@@ -1,3 +1,11 @@
+param(
+  # -CI skips all user-level / machine-local assertions (repo-local provider
+  # links and registry-driven home-dir junctions) so the harness can run on a
+  # clean CI checkout. All repo-content checks (frontmatter, evals, README
+  # catalog rows, docs-cache records, dependency order) still run.
+  [switch]$CI
+)
+
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -16,7 +24,8 @@ $InstalledSkills = @(
   "tri-client-skill-port",
   "skill-trigger-evalsmith",
   "agent-install-sync",
-  "skill-center-curator"
+  "skill-center-curator",
+  "skill-doctor"
 )
 
 $ProviderRoots = @(
@@ -25,11 +34,10 @@ $ProviderRoots = @(
   ".kimi-code\skills"
 )
 
-$UserInstallRoots = @(
-  "$HOME\.codex\skills",
-  "$HOME\.claude\skills",
-  "$HOME\.kimi-code\skills"
-)
+# Legacy user install roots ($HOME\.codex\skills, $HOME\.kimi-code\skills) are
+# intentionally empty: Codex reads only ~/.agents/skills at user scope, and Kimi
+# reads ~/.kimi-code/skills then ~/.agents/skills. User-level link assertions are
+# driven from registry/skills.json below instead of hardcoded roots.
 
 $Failures = New-Object System.Collections.Generic.List[string]
 
@@ -130,27 +138,24 @@ function Test-ProviderLink {
 
 function Test-UserSkillLink {
   param(
-    [string]$Skill,
-    [string]$Root
+    [string]$LinkPath,
+    [string]$Expected
   )
 
-  $linkPath = Join-Path $Root $Skill
-  $expected = (Resolve-Path -LiteralPath (Join-Path $RepoRoot $Skill)).Path
-
-  if (-not (Test-Path -LiteralPath $linkPath)) {
-    Add-Failure "Missing user skill link: $linkPath"
+  if (-not (Test-Path -LiteralPath $LinkPath)) {
+    Add-Failure "Missing user skill link: $LinkPath"
     return
   }
 
-  $item = Get-Item -LiteralPath $linkPath -Force
+  $item = Get-Item -LiteralPath $LinkPath -Force
   if ($item.LinkType -ne "SymbolicLink" -and $item.LinkType -ne "Junction") {
-    Add-Failure "User skill entry is not a symlink or junction: $linkPath"
+    Add-Failure "User skill entry is not a symlink or junction: $LinkPath"
     return
   }
 
   $resolved = Resolve-LinkTarget $item
-  if ($resolved -ne $expected) {
-    Add-Failure "User skill link target mismatch: $linkPath -> $resolved expected $expected"
+  if ($resolved -ne $Expected) {
+    Add-Failure "User skill link target mismatch: $LinkPath -> $resolved expected $Expected"
   }
 }
 
@@ -249,13 +254,45 @@ foreach ($skill in $WorkflowSkills) {
   }
 }
 
-foreach ($skill in $InstalledSkills) {
-  foreach ($root in $ProviderRoots) {
-    Test-ProviderLink $skill $root
+if ($CI) {
+  Write-Host "[CI] skipping user-level link checks (repo-local provider links and home-dir junctions)" -ForegroundColor Yellow
+}
+else {
+  foreach ($skill in $InstalledSkills) {
+    foreach ($root in $ProviderRoots) {
+      Test-ProviderLink $skill $root
+    }
   }
 
-  foreach ($root in $UserInstallRoots) {
-    Test-UserSkillLink $skill $root
+  # User-level junction assertions driven from registry/skills.json: every
+  # repo-canonical skill with an install method of "junction:<path>" must have a
+  # junction at <path> resolving to its canonical repo directory. This asserts the
+  # current layout (~/.agents/skills for codex/kimi/vscode, ~/.claude/skills for
+  # claude) without hardcoding provider roots.
+  $registryPath = Join-Path $RepoRoot "registry\skills.json"
+  $registry = Read-JsonFile $registryPath
+  if ($null -eq $registry) {
+    Add-Failure "Missing or invalid registry: $registryPath"
+  }
+  else {
+    $checkedLinks = @{}
+    foreach ($entry in $registry.skills) {
+      if ($entry.canonical.type -ne "repo") { continue }
+      $expected = (Resolve-Path -LiteralPath (Join-Path $RepoRoot $entry.canonical.path)).Path
+      foreach ($prop in $entry.install.PSObject.Properties) {
+        $method = [string]$prop.Value
+        if (-not $method.StartsWith("junction:")) { continue }
+        $linkPath = $method.Substring("junction:".Length)
+        if ($linkPath.StartsWith("~/") -or $linkPath.StartsWith("~\")) {
+          $linkPath = Join-Path $HOME $linkPath.Substring(2)
+        }
+        $linkPath = [System.IO.Path]::GetFullPath($linkPath)
+        $key = $linkPath.ToLowerInvariant()
+        if ($checkedLinks.ContainsKey($key)) { continue }
+        $checkedLinks[$key] = $true
+        Test-UserSkillLink $linkPath $expected
+      }
+    }
   }
 }
 

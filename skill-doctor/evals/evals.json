@@ -1,0 +1,29 @@
+{
+  "skill_name": "skill-doctor",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My skills are a mess — Claude shows duplicates and Codex stopped loading one of them. Get my skills back in order.",
+      "expected_output": "Runs skillctl audit, then sync --plan, reviews actions, applies sync (archiving strays, never deleting), finishes with verify and the per-provider ok/fixed/archived/attention report.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The caveman repo got new commits upstream. Update my local caveman skills and make sure nothing breaks in Kimi.",
+      "expected_output": "Runs skillctl update --skill caveman in plan mode, then --apply (archiving the old canonical into _archive), records the new commit in the upstream cache, and ends with verify.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I dropped a random folder into ~/.agents/skills and now I'm not sure what's installed where. Audit my skill setup but don't delete anything.",
+      "expected_output": "Runs skillctl audit, reports the stray, explains it would be moved to _archive/<date>/ by sync --apply, and does not hard-delete anything.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Write a new SKILL.md for my custom linter skill.",
+      "expected_output": "Should NOT trigger skill-doctor; this is skill authoring, not cross-provider install repair (skill-creator or tri-client-skill-port territory).",
+      "files": []
+    }
+  ]
+}

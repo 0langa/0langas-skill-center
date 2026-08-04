@@ -7,10 +7,9 @@ This repo is intended to grow into a broader skill center, not a single-purpose 
 ## Layout
 
 - Top-level skill folders, such as `official-ai-devdocs/`, are the canonical source directories.
-- `.claude/skills/` exposes compatible skills to Claude Code.
-- `.kimi-code/skills/` exposes compatible skills to Kimi Code.
-- `.codex/skills/` keeps Codex-facing skills grouped with other Codex project files.
-- Provider discovery directories may use symlinks back to the canonical top-level skill folder to avoid duplicate copies.
+- User-level discovery is via junctions/symlinks: `~/.agents/skills/<name>` (read natively by Codex, Kimi Code, and VS Code Copilot) and `~/.claude/skills/<name>` (Claude Code). Note: current Codex does NOT scan `~/.codex/skills`.
+- Repo-local `.claude/skills/`, `.kimi-code/skills/`, `.codex/skills/` link the skills for working inside this repo itself.
+- `registry/skills.json` + `tools/skillctl.py` manage and verify that link layout — see "Skill management system" below.
 
 ## Skills
 
@@ -23,6 +22,37 @@ This repo is intended to grow into a broader skill center, not a single-purpose 
 | `skill-trigger-evalsmith` | Creates realistic should-trigger and should-not-trigger activation evals so skill autoactivation can be tuned instead of guessed. | Codex, Claude Code, Kimi Code |
 | `agent-install-sync` | Keeps canonical skill directories, repo-local provider links, user-level Codex links, and duplicate legacy installs aligned without copying skill content. | Codex, Claude Code, Kimi Code |
 | `skill-center-curator` | Orchestrates docs evidence, tri-client porting, trigger evals, install sync, README updates, tests, and publish readiness for this skill collection. | Codex, Claude Code, Kimi Code |
+| `skill-doctor` | Diagnoses and repairs the cross-provider skill setup (broken/duplicate/missing skills, junction repair, upstream refreshes) by driving `tools/skillctl.py` against `registry/skills.json`. | Codex, Claude Code, Kimi Code |
+
+## Skill management system
+
+This repo is the management hub for skills installed across Codex CLI, Claude Code, Kimi Code, and VS Code Copilot.
+
+- `registry/skills.json` is the machine-readable source of truth: provider scan layouts (encoded as data), every known skill, its canonical location, its optional GitHub upstream, and its per-provider install method (`agents`, `agents/skills`, `kimi`, `junction:<path>`, `plugin:<id>`, `inherit`, `none`).
+- `tools/skillctl.py` (Python 3.11+, stdlib only) reconciles reality to the registry:
+  - `python tools/skillctl.py audit` — scan all provider scan dirs and report missing installs, strays, duplicates, broken/wrong-target junctions, and frontmatter validation errors (exit 1 on any problem).
+  - `python tools/skillctl.py sync [--plan|--apply] [--only <path-or-name>...]` — plan (default) or apply reconciliation: create/repair junctions, and move anything that must be removed into `_archive/` (never delete). Idempotent. `--only` limits the plan to selected paths/skills for per-item repairs.
+  - `python tools/skillctl.py verify [--ci]` — every registry skill resolves at every mapped location with valid frontmatter (exit non-zero on failure). `--ci` runs repo-local checks only (no home-dir access) and is what CI runs.
+  - `python tools/skillctl.py update [--skill <name>] [--apply]` — refresh skills with a GitHub upstream: skip when the cached commit is unchanged (`registry/.upstream-cache.json`), otherwise snapshot the state, archive the old canonical, and replace it with the upstream subpath.
+  - `python tools/skillctl.py register [--scan] [<path>...] [--upstream OWNER/REPO[:SUBPATH]] [--apply]` — adopt newly installed skills into the registry: `--scan` lists unregistered skills across provider dirs; path-based registration infers the per-provider install map automatically.
+  - `python tools/skillctl.py discover [--fetch <name>...] [--apply]` — list skills that exist in known upstream GitHub repos but are not registered; `--fetch` downloads one into `~/.agents/skills/` and registers it with its upstream recorded.
+  - `python tools/skillctl.py unregister <name>... [--archive-canonical] [--apply]` — remove registry entries (files stay by default; `--archive-canonical` also archives the canonical copy; repo-managed skills refused).
+  - `python tools/skillctl.py snapshot [--label <text>]` — write registry + link map + skill listing to `_archive/snapshots/<timestamp>/` (also runs automatically before `update --apply`).
+  - `python tools/skillctl.py plugins` — read-only report of installed claude/kimi plugins, the skills they provide, and overlaps with registry skills.
+  - `python tools/skillctl.py archive <path> [--reason <text>]` — manually move a skill directory into `_archive/` with a log entry.
+  - Mutating subcommands plan by default; `--apply` executes, `--dry-run` is an explicit no-change alias and conflicts with `--apply`.
+- `_archive/` convention: outdated, misconfigured, duplicated, or stray skills are **archived, never deleted** — moved to `_archive/<YYYYMMDD>/` and logged in `_archive/LOG.md`.
+- The one command to get everything back in order: the `skill-doctor` skill (`/skill-doctor` in Claude Code, `skill:skill-doctor` in Kimi Code, or just ask Codex to "get my skills back in order"). Tell it what you want in the same prompt (check, register new, discover, update, clean up): it plans the sequence, asks before every disk change (subset answers honored), then reports per provider.
+- CI: `.github/workflows/skill-verify.yml` runs `verify --ci` and the e2e harness (`-CI` mode) on every push and PR.
+
+### Provider matrix (verified 2026-08-04)
+
+| Provider | Scans | Dedupe | Notes |
+| --- | --- | --- | --- |
+| Codex CLI | `~/.agents/skills` (+ repo `.agents/skills` upward, `/etc/codex/skills`, bundled) | none | `~/.codex/skills` is NOT scanned; follows junctioned skill folders |
+| Kimi Code | `~/.kimi-code/skills`, then `~/.agents/skills` | by name, first scope wins | nested sub-skill bundles via `has-sub-skill: true` |
+| Claude Code | `~/.claude/skills` (+ project `.claude/skills`, plugins) | by target | does NOT read `.agents`; plugin skills are namespaced `plugin:skill` |
+| VS Code Copilot | `~/.copilot/skills`, `~/.claude/skills`, `~/.agents/skills` | none | lowest priority |
 
 ## Validation
 
@@ -32,7 +62,7 @@ Run the repo E2E checks after adding, renaming, moving, or publishing skills:
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\skill-center.e2e.ps1
 ```
 
-The test verifies required skill frontmatter, JSON eval files, trigger-eval coverage, provider symlink resolution, user-level install links for Codex, Claude Code, and Kimi Code, README catalog coverage, official docs cache records, and the intended dependency order between these five workflow skills.
+The test verifies required skill frontmatter, JSON eval files, trigger-eval coverage, repo-local provider link resolution, registry-driven user-level junctions in `~/.agents/skills` and `~/.claude/skills` (the authoritative layout; `~/.codex/skills` and `~/.kimi-code/skills` are intentionally not used for repo skills), README catalog coverage, official docs cache records, and the intended dependency order between these five workflow skills.
 
 ## Candidate Skills
 

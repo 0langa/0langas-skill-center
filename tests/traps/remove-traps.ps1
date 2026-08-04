@@ -1,0 +1,32 @@
+# Removes the skill-doctor trap suite and restores the original healthy state.
+# Also safe to run if a test round archived the decoys (missing paths are skipped).
+$ErrorActionPreference = 'Continue'
+$A = "$HOME\.agents\skills"
+
+foreach ($p in @("$A\markdown-toolbox", "$A\pr-review-buddy", "$A\old-python-scripts",
+                 "$A\notes-backup.zip", "$A\skills\web-scraper-utils", "$A\draft-formatter",
+                 "$A\json-fixer", "$A\usage-report",
+                 "$HOME\.claude\skills\pdf-tools", "$HOME\.copilot\skills\snippet-vault")) {
+  if (Test-Path $p) { Remove-Item -Recurse -Force $p }
+}
+# broken junction (remove the link itself only)
+if (Test-Path "$A\legacy-link") { cmd /c rmdir "$A\legacy-link" | Out-Null }
+# restore the tri-client-skill-port claude junction to its correct target
+cmd /c rmdir "$HOME\.claude\skills\tri-client-skill-port" | Out-Null
+cmd /c mklink /J "$HOME\.claude\skills\tri-client-skill-port" "$HOME\source\repos\0langas-skill-center\tri-client-skill-port" | Out-Null
+# remove ghost registry entry + any decoy registrations the agent may have added
+python -c @"
+import json, os
+p = os.path.join(os.path.expanduser('~'), 'source/repos/0langas-skill-center/registry/skills.json').replace('/', os.sep)
+r = json.load(open(p, encoding='utf-8'))
+drop = {'ghost-ledger', 'markdown-toolbox', 'pr-review-buddy', 'web-scraper-utils', 'pdf-tools', 'snippet-vault'}
+before = len(r['skills'])
+r['skills'] = [s for s in r['skills'] if s['name'] not in drop]
+tmp = p + '.tmp'
+json.dump(r, open(tmp, 'w', encoding='utf-8', newline='\n'), indent=2, ensure_ascii=False)
+open(tmp, 'a', encoding='utf-8', newline='\n').write('\n')
+os.replace(tmp, p)
+print(f'registry cleaned: {before} -> ' + str(len(r['skills'])))
+"@
+Write-Output 'trap suite removed; tri-client junction restored'
+Write-Output 'note: if a test round archived decoys, they are safe in _archive/ (can be purged manually)'

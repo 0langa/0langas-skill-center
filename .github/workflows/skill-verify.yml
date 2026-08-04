@@ -1,0 +1,46 @@
+# skill-verify
+#
+# Guards the skill center's repo-local invariants on every push/PR to main.
+# Runs on windows-latest because provider installs use NTFS junction/symlink
+# semantics that only Windows exercises faithfully.
+#
+# Steps:
+#   1. `python tools/skillctl.py verify --ci`
+#      Guards registry/skill metadata invariants that skillctl enforces
+#      (repo-local only; --ci mode never touches the user home directory).
+#   2. `pwsh tests/skill-center.e2e.ps1 -CI`
+#      Guards repo-content invariants: SKILL.md frontmatter fields,
+#      evals.json / trigger-evals.json shape and coverage, README catalog
+#      rows, official-docs cache records, and dependency order between the
+#      workflow skills. The -CI switch skips machine-local link assertions
+#      (repo-local provider links and home-dir junctions) that cannot exist
+#      on a clean CI checkout.
+#
+# Both steps must exit 0; any non-zero exit fails the build.
+
+name: skill-verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: skillctl repo-local invariants
+        run: python tools/skillctl.py verify --ci
+
+      - name: E2E repo-content checks (CI mode)
+        shell: pwsh
+        run: pwsh -NoProfile -File tests/skill-center.e2e.ps1 -CI

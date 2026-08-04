@@ -1,0 +1,90 @@
+[
+  {
+    "id": "T001",
+    "query": "My skills are a mess — Claude shows duplicates and Codex stopped loading one. Get my skills back in order.",
+    "should_trigger": true,
+    "reason": "Direct request to diagnose and repair the cross-provider skill setup.",
+    "competing_skills": ["agent-install-sync"],
+    "expected_routing": "Run skillctl audit, sync --plan, sync --apply, verify, then report per-provider status."
+  },
+  {
+    "id": "T002",
+    "query": "Sync my skills across Codex, Kimi, and Claude — I think some junctions are broken.",
+    "should_trigger": true,
+    "reason": "Skill sync and junction repair is the skill's core purpose.",
+    "competing_skills": ["agent-install-sync"],
+    "expected_routing": "Audit first, show the sync plan, apply only after review, never delete (archive only)."
+  },
+  {
+    "id": "T003",
+    "query": "Update my caveman skills from the upstream GitHub repo and confirm nothing broke.",
+    "should_trigger": true,
+    "reason": "Upstream refresh of registry skills with a github upstream.",
+    "competing_skills": [],
+    "expected_routing": "Run skillctl update in plan mode, then --apply with archive of the old canonical, finish with verify."
+  },
+  {
+    "id": "T004",
+    "query": "Register all newly installed skills, after that see if there are updates for any of my skills and act on your findings so I'm all up-to-date and synced again.",
+    "should_trigger": true,
+    "reason": "Composite request: register strays into the registry, then upstream update — the skill's plan-confirm-execute sequence.",
+    "competing_skills": ["agent-install-sync"],
+    "expected_routing": "Plan the sequence, register --scan, ask before register --apply (subset answers honored), update --dry-run without asking, ask before update --apply, verify, report."
+  },
+  {
+    "id": "T005",
+    "query": "Dry-run: check for skill updates but don't change anything yet.",
+    "should_trigger": true,
+    "reason": "Check-only mode — read-only report of what would change.",
+    "competing_skills": [],
+    "expected_routing": "Run audit, register --scan, sync --plan, update --dry-run, verify; report prefixed DRY RUN; never --apply."
+  },
+  {
+    "id": "T006",
+    "query": "Am I missing any skills? Check the caveman and anthropic repos for anything new and install what's missing.",
+    "should_trigger": true,
+    "reason": "Upstream discovery of unregistered skills, then fetch+register of the confirmed subset.",
+    "competing_skills": [],
+    "expected_routing": "Run skillctl discover (read-only), present the list, ask, then discover --fetch <name> --apply per confirmed skill, verify, report."
+  },
+  {
+    "id": "T007",
+    "query": "My skill setup feels off since yesterday — several things are broken, duplicated, or misplaced, but I haven't had time to look into it. Do a full health check of my skill setup across ALL my agent clients (Codex, Claude Code, Kimi Code, VS Code) and report everything wrong you can find. Do not change, fix, register, unregister, or archive anything yet — I want the findings first.",
+    "should_trigger": true,
+    "reason": "Skill-focused cross-provider health check, report-only — skill-doctor's core turf. Lost to customization-audit in a live Codex test (2026-08-04) because its description matched 'audit across clients' phrasing more literally; description retuned to win this.",
+    "competing_skills": ["customization-audit"],
+    "expected_routing": "skill-doctor wins: the request is about the skill setup specifically (broken/duplicated/misplaced skills, per-provider visibility), even though read-only. customization-audit only wins when the audit scope is broader than skills (plugins, MCP, marketplaces, configs)."
+  },
+  {
+    "id": "N004",
+    "query": "Audit all my agent customizations — I want a full inventory of plugins, MCP servers, hooks, marketplaces, and where everything is installed across my coding tools.",
+    "should_trigger": false,
+    "reason": "Broad all-customization audit, not skill-layer work — customization-audit's explicit territory.",
+    "competing_skills": ["customization-audit"],
+    "expected_routing": "Route to customization-audit (customization-control plugin); skill-doctor only if the follow-up is skill-specific repair/update/register."
+  },
+  {
+    "id": "N001",
+    "query": "Write a SKILL.md for a brand-new linter skill I want to create.",
+    "should_trigger": false,
+    "reason": "Skill authoring, not install repair; skill-creator or tri-client-skill-port territory.",
+    "competing_skills": ["skill-creator", "tri-client-skill-port"],
+    "expected_routing": "Route to skill creation/porting, not skill-doctor."
+  },
+  {
+    "id": "N002",
+    "query": "Port this skill so it works in Codex, Claude Code, and Kimi Code.",
+    "should_trigger": false,
+    "reason": "Tri-client porting of one skill, not reconciling existing installs.",
+    "competing_skills": ["tri-client-skill-port"],
+    "expected_routing": "Route to tri-client-skill-port."
+  },
+  {
+    "id": "N003",
+    "query": "Why did my PowerShell profile stop loading after the Windows update?",
+    "should_trigger": false,
+    "reason": "General Windows troubleshooting unrelated to agent skill installs.",
+    "competing_skills": ["windows-powershell"],
+    "expected_routing": "Route to windows-powershell or general debugging, not skill-doctor."
+  }
+]

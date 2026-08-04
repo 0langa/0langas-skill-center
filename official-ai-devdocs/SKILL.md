@@ -29,7 +29,7 @@ Use these entry points and then navigate to the most specific page for the task.
 
 | Provider | Official docs entry point | Use for |
 | --- | --- | --- |
-| Codex | `https://developers.openai.com/codex` | Codex CLI/app/web/IDE behavior, `config.toml`, `AGENTS.md`, skills, plugins, MCP, hooks, permissions, automations, subagents, integrations |
+| Codex | `https://developers.openai.com/codex` | Codex CLI/app/web/IDE behavior, `config.toml`, `AGENTS.md`, skills, plugins, MCP, hooks, permissions, automations, subagents, integrations. Note (verified 2026-08-04): since the Codex/ChatGPT merger the base page serves a combined ChatGPT overview; the Codex reference pages under `/codex/*` (e.g. `/codex/skills`, `/codex/config-reference`) remain the canonical deep links and cover the merged ChatGPT Work / desktop surfaces too |
 | Claude Code | `https://code.claude.com/docs/en/overview` | Claude Code CLI/desktop/web/IDE behavior, `.claude` directory, `CLAUDE.md`, skills, hooks, MCP, sessions, permission modes, settings, commands |
 | Kimi Code | `https://www.kimi.com/code/docs/en/` | Kimi Code CLI/VS Code behavior, configuration files, providers/models, overrides, environment variables, MCP, skills, plugins, agents, hooks, third-party coding-agent setup |
 
@@ -39,7 +39,7 @@ For Claude Code, first fetch or inspect `https://code.claude.com/docs/llms.txt` 
 
 This skill is written as a directory-form `SKILL.md` skill with YAML frontmatter and Markdown instructions so it is usable by Codex, Claude Code, and Kimi Code.
 
-- Codex uses `name` and `description`. This repository keeps Codex-facing skills under `.codex/skills` for clean provider-specific organization. For user-wide Codex discovery, install or symlink the canonical skill into the Codex skills home, such as `~/.codex/skills`.
+- Codex uses `name` and `description`. Current Codex (per https://developers.openai.com/codex/skills) discovers user-level skills from `~/.agents/skills` (plus repo `.agents/skills` up to the repo root, admin `/etc/codex/skills`, and bundled system skills); `~/.codex/skills` is NOT a documented scan location in current Codex. For user-wide Codex discovery, install or symlink the canonical skill into `~/.agents/skills` — symlinked skill folders are followed.
 - Claude Code uses `description` and optional `when_to_use`, and discovers project skills from `.claude/skills`.
 - Kimi Code uses `name`, `description`, `type`, `whenToUse`, and `disableModelInvocation`, and discovers project skills from `.kimi-code/skills`.
 

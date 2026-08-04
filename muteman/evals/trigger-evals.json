@@ -1,0 +1,34 @@
+[
+  {
+    "id": "T001",
+    "query": "shut up and code — fix the failing tests, no commentary",
+    "should_trigger": true,
+    "reason": "Direct silence request for repo work; core trigger phrase.",
+    "competing_skills": ["caveman"],
+    "expected_routing": "muteman wins: user wants NO chat, not compressed chat (caveman still talks)."
+  },
+  {
+    "id": "T002",
+    "query": "quiet mode for the rest of this migration, I'll check the result myself",
+    "should_trigger": true,
+    "reason": "Explicit quiet-mode request with a session scope.",
+    "competing_skills": ["caveman"],
+    "expected_routing": "muteman over caveman: silence, not brevity."
+  },
+  {
+    "id": "T003",
+    "query": "talk like caveman to save tokens",
+    "should_trigger": false,
+    "reason": "Compressed-but-present communication is caveman's trigger, not muteman's.",
+    "competing_skills": ["caveman"],
+    "expected_routing": "Route to caveman."
+  },
+  {
+    "id": "N001",
+    "query": "Walk me through your reasoning on this bug before you change anything.",
+    "should_trigger": false,
+    "reason": "User wants MORE narration — opposite intent.",
+    "competing_skills": [],
+    "expected_routing": "No silence skill; normal verbose answer."
+  }
+]

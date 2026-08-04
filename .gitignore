@@ -1,0 +1,15 @@
+# Machine-local state (may contain user-specific absolute paths)
+_archive/*
+!_archive/README.md
+.recall/
+registry/.upstream-cache.json
+registry/*.tmp
+registry/*.lock
+
+# Python
+__pycache__/
+*.pyc
+
+# OS noise
+Thumbs.db
+.DS_Store

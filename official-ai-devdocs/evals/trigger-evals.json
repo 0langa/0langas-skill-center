@@ -1,0 +1,34 @@
+[
+  {
+    "id": "T001",
+    "query": "Can I put skills in ~/.codex/skills for Codex to find them?",
+    "should_trigger": true,
+    "reason": "Provider-specific discovery question — must be answered from official Codex docs, not memory (correct answer changed over time).",
+    "competing_skills": [],
+    "expected_routing": "Fetch the official Codex skills docs before answering."
+  },
+  {
+    "id": "T002",
+    "query": "What's the current frontmatter field name for disabling auto-invocation in Claude Code skills?",
+    "should_trigger": true,
+    "reason": "Exact provider syntax lookup; docs-first rule applies.",
+    "competing_skills": [],
+    "expected_routing": "Consult code.claude.com skills reference before answering."
+  },
+  {
+    "id": "T003",
+    "query": "Set up an MCP server in Kimi Code.",
+    "should_trigger": true,
+    "reason": "Provider config task; kimi-code docs own the exact mcp.json shape.",
+    "competing_skills": [],
+    "expected_routing": "Check the Kimi Code MCP docs first."
+  },
+  {
+    "id": "N001",
+    "query": "How do I center a div in CSS?",
+    "should_trigger": false,
+    "reason": "General programming question, no provider-specific surface involved.",
+    "competing_skills": [],
+    "expected_routing": "Answer directly; no provider docs needed."
+  }
+]
