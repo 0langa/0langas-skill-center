@@ -24,6 +24,24 @@ This repo is intended to grow into a broader skill center, not a single-purpose 
 | `skill-center-curator` | Orchestrates docs evidence, tri-client porting, trigger evals, install sync, README updates, tests, and publish readiness for this skill collection. | Codex, Claude Code, Kimi Code |
 | `skill-doctor` | Diagnoses and repairs the cross-provider skill setup (broken/duplicate/missing skills, junction repair, upstream refreshes) by driving `tools/skillctl.py` against `registry/skills.json`. | Codex, Claude Code, Kimi Code |
 
+## Engineering domain skills
+
+Stack-specific skills for the projects in this workspace (Tauri/React/WebGPU desktop apps, .NET Windows apps, Rust and Python sidecars, SQLite storage, MCP servers). They encode the invariants, gates, and hard-won traps of those repos rather than generic framework advice, so they sit on top of - not instead of - commodity skills such as `winui-design`, `webgpu`, or `frontend-design`.
+
+| Skill | Purpose | Provider compatibility |
+| --- | --- | --- |
+| `repo-quality-gates` | Finds the repo's canonical gate manifest and runs the correct gate set per stack before anything is called done, with the no-rerun anti-flake protocol and evidence-based reporting. | Codex, Claude Code, Kimi Code |
+| `autonomous-work-ledger` | Drives unattended and cross-session work through the BACKLOG / NEXT_STEPS / PROJECT_STATE / WORK_STATUS ledger: one item per cycle, gates, same-change doc updates, explicit stop conditions. | Codex, Claude Code, Kimi Code |
+| `windows-release-ritual` | End-to-end release of a Windows desktop app: version surfaces, changelog as user-facing UI, tag and CI watch, asset and checksum verification, updater and rollback proof, unsigned-binary honesty. | Codex, Claude Code, Kimi Code |
+| `determinism-and-golden-baselines` | Protects the preview/export determinism law, shared time chokepoints, preset purity, permanent persisted IDs, and the discipline for re-blessing pixel-hash, golden-trace, and snapshot baselines. | Codex, Claude Code, Kimi Code |
+| `persisted-format-migrations` | Numbered migration chains for SQLite, document JSON, settings, and cross-process JSONL contracts: never edit a shipped level, tolerate older producers, keep a fixture per shipped version. | Codex, Claude Code, Kimi Code |
+| `destructive-operation-safety` | Single deletion chokepoint, read-only analysis, dry-run to quarantine to permanent ladder, restore records, atomic publication, and the workspace off-limits rules. | Codex, Claude Code, Kimi Code |
+| `measured-performance-work` | Measurement before optimization, the seven recurring slow-shapes in this portfolio, realtime frame budgets, before/after numbers in the commit, and a guard against regression. | Codex, Claude Code, Kimi Code |
+| `desktop-app-ux-polish` | App-shell UX rules for WinUI 3, WPF, and Tauri/React shells: 200 percent scale, parse-time theme resources, verified contrast, honest progress, long-job controls, platform-safe confirmation. | Codex, Claude Code, Kimi Code |
+| `sidecar-process-integration` | Bundled external binaries and child processes: pinned fetches, dev-versus-packaged path resolution, versioned line-delimited JSON protocols, cancellation and resume, licence notices. | Codex, Claude Code, Kimi Code |
+| `local-first-scope-guard` | Guards the free, local-first, no-cloud, no-accounts, no-telemetry, minimal-dependency product invariants and the legal and licence surface of the media tools. | Codex, Claude Code, Kimi Code |
+| `mcp-server-contracts` | Design and hardening rules for MCP servers: tool-surface shape, workspace confinement, ambiguity refusal, atomic mutation with recovery, the unit-to-hardening test ladder, packaging. | Codex, Claude Code, Kimi Code |
+
 ## Skill management system
 
 This repo is the management hub for skills installed across Codex CLI, Claude Code, Kimi Code, and VS Code Copilot.

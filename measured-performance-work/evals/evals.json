@@ -1,0 +1,29 @@
+{
+  "skill_name": "measured-performance-work",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Folder totals get slower the deeper the tree - fix it.",
+      "expected_output": "Measures first, identifies the quadratic recomputation or unindexed query, resolves totals once per group or adds the index in a new migration level, and reports before/after numbers with the exact command.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Cut the per-file cost in the managed scanner.",
+      "expected_output": "Counts syscalls per file, collapses three calls into one where the same metadata is available, benchmarks before and after, and adds a benchmark or bounded assertion so the regression is caught.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "This optimization removes the frameResolve chokepoint and reads wall clock instead - it is 15 percent faster.",
+      "expected_output": "Rejects it: determinism outranks speed, the change would diverge preview from export, and proposes an alternative that keeps the chokepoint.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "What is Big-O notation?",
+      "expected_output": "Should NOT trigger; a general theory question with no code under measurement.",
+      "files": []
+    }
+  ]
+}

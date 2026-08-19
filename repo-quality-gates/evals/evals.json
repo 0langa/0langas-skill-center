@@ -1,0 +1,29 @@
+{
+  "skill_name": "repo-quality-gates",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I finished the StorageMaster dedupe fix - are we good to commit?",
+      "expected_output": "Locates the canonical gate list, runs dotnet build plus dotnet test plus dotnet format --verify-no-changes and the Rust turbo-scanner gates, checks the UI exe was rebuilt for x64, quotes each result, and does not run git commit without an explicit request.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The featurePipelineFuzz suite fails only when I run the full test command. Just rerun it a few times?",
+      "expected_output": "Refuses the rerun, identifies the 5 s default per-test timeout under full-suite parallelism as the cause, adds a describe-level budget with a written justification, and reruns the gate to show it green.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Give me the exact commands that count as gates for the audio-visualizer repo.",
+      "expected_output": "Reads GATES.md and reports the web set, the cargo --workspace set, and the device gates with when each is mandatory, noting GATES.md wins over CLAUDE.md if they disagree.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Explain what vitest is.",
+      "expected_output": "Should NOT trigger; a general tooling question with no completion claim or failing gate.",
+      "files": []
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "skill_name": "desktop-app-ux-polish",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Apply the dark-first instrument-panel identity across every page.",
+      "expected_output": "Defines accent-selectable tokens that resolve at parse time, verifies contrast on real content in both themes, checks every page at 200 percent scale for starved panels, and confirms no untranslated new strings.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Add a confirm dialog before clearing the queue in Beatform.",
+      "expected_output": "Uses askConfirm() from src/state/platform.ts rather than window.confirm, which the Tauri dialog ACL blocks silently, and states the item count in the prompt.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "The progress bar sits at 100 percent for ten seconds before the file appears.",
+      "expected_output": "Treats it as dishonest progress: the verification and publish step must be represented in the progress model, and completion means the output exists.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Write a unit test for the duplicate finder.",
+      "expected_output": "Should NOT trigger; no UI shell surface involved.",
+      "files": []
+    }
+  ]
+}

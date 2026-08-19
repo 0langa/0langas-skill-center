@@ -1,0 +1,44 @@
+[
+  {
+    "id": "T001",
+    "query": "Let's add anonymous crash reporting so we know what breaks.",
+    "should_trigger": true,
+    "reason": "Telemetry crosses a stated product invariant.",
+    "competing_skills": [],
+    "expected_routing": "Name the invariant, decline to add it silently, and offer a local-only log the user can attach to an issue instead."
+  },
+  {
+    "id": "T002",
+    "query": "Add a Pro tier that unlocks 4K export.",
+    "should_trigger": true,
+    "reason": "Paid tier crosses the free-and-open invariant.",
+    "competing_skills": [],
+    "expected_routing": "State that these products are free with no paid tiers, and do not implement it without the user explicitly reopening that decision."
+  },
+  {
+    "id": "T003",
+    "query": "Just pull in a NuGet package for the HLS parsing.",
+    "should_trigger": true,
+    "reason": "TubeForge is deliberately built without third-party NuGet.",
+    "competing_skills": [],
+    "expected_routing": "Check the project dependency stance, state what the package replaces, and ask before adding - it is a product decision."
+  },
+  {
+    "id": "T004",
+    "query": "Soften the README warning so the download page reads better.",
+    "should_trigger": true,
+    "reason": "Legal-surface honesty for a media tool.",
+    "competing_skills": [],
+    "expected_routing": "Keep the user-responsibility notice and the explicit no-DRM-bypass statement intact."
+  },
+  {
+    "id": "T005",
+    "query": "Add a keyboard shortcut for pause.",
+    "should_trigger": false,
+    "reason": "Ordinary feature work touching no invariant.",
+    "competing_skills": [
+      "desktop-app-ux-polish"
+    ],
+    "expected_routing": "Do not trigger."
+  }
+]

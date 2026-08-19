@@ -1,0 +1,46 @@
+[
+  {
+    "id": "T001",
+    "query": "Beatform builds fine on my machine, I think the shader tweak is done - can I call it finished?",
+    "should_trigger": true,
+    "reason": "Claiming completion is exactly the trigger; the repo gate set plus the GPU device gate must run first.",
+    "competing_skills": [
+      "superpowers:verification-before-completion"
+    ],
+    "expected_routing": "Read GATES.md, run the five web gates plus the cargo --workspace gates, run test:gpu because a shader changed, quote each result."
+  },
+  {
+    "id": "T002",
+    "query": "The audio tests keep timing out when I run the whole suite - can we bump the retries?",
+    "should_trigger": true,
+    "reason": "Flaky-looking test failure; the anti-flake protocol forbids reruns and demands a describe-level timeout budget instead.",
+    "competing_skills": [],
+    "expected_routing": "Refuse rerun/retry; diagnose the default per-test timeout, add an explicit describe budget with a written reason, then rerun the real gate."
+  },
+  {
+    "id": "T003",
+    "query": "cargo test passes in src-tauri, so the Rust side is green.",
+    "should_trigger": true,
+    "reason": "Bare cargo silently skips workspace members; the claim needs verification with --workspace.",
+    "competing_skills": [],
+    "expected_routing": "Point out the missing --workspace/--all, rerun fmt/clippy/test with it, report the real result."
+  },
+  {
+    "id": "T004",
+    "query": "CI is red on format:check but everything passes locally. What now?",
+    "should_trigger": true,
+    "reason": "Local-versus-CI disagreement is a gate-drift symptom.",
+    "competing_skills": [],
+    "expected_routing": "Locate the canonical gate manifest, find which definition drifted, fix the drift in the same change rather than forking a second definition."
+  },
+  {
+    "id": "T005",
+    "query": "Write a new preset that renders concentric rings.",
+    "should_trigger": false,
+    "reason": "Pure implementation request with no completion claim; gates apply at the end, not as the entry skill.",
+    "competing_skills": [
+      "determinism-and-golden-baselines"
+    ],
+    "expected_routing": "Do not lead with this skill; implement first, then run gates before claiming done."
+  }
+]

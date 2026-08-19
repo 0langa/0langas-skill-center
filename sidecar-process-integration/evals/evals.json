@@ -1,0 +1,29 @@
+{
+  "skill_name": "sidecar-process-integration",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Bundle a new whisper model with the lyrics sidecar.",
+      "expected_output": "Adds a fetch script with a pinned version and hash verification, keeps the binary out of git, documents the one-time setup, wires packaged and dev path resolution, and adds the THIRD_PARTY_NOTICES entry.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The turbo scanner beside the exe is an old build and the app crashes on its output.",
+      "expected_output": "Versions the JSONL contract, tolerates the older producer with nullable fields plus a per-item fallback, and refuses a producer too old to be safe with the required version in the message.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Large downloads restart from zero when the app is closed mid-transfer.",
+      "expected_output": "Adds a bounded resumable journal so an interrupted transfer recovers, reaps stale state on startup, and validates the finished output before publishing it atomically.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Explain how FFmpeg encodes H.264.",
+      "expected_output": "Should NOT trigger; a codec theory question, not a sidecar integration task.",
+      "files": []
+    }
+  ]
+}

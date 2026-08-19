@@ -1,0 +1,46 @@
+[
+  {
+    "id": "T001",
+    "query": "I changed the bloom shader and 300 pixel-hash cases now fail. Update the baselines?",
+    "should_trigger": true,
+    "reason": "Baseline re-bless decision - the core purpose of this skill.",
+    "competing_skills": [],
+    "expected_routing": "Verify visually on device first, sanity-check that 300 moved cases matches a bloom change, then run test:gpu:update and justify the bless in the commit body."
+  },
+  {
+    "id": "T002",
+    "query": "The exported video looks different from the preview after my transition change.",
+    "should_trigger": true,
+    "reason": "Preview/export divergence is the determinism law being violated.",
+    "competing_skills": [],
+    "expected_routing": "Find where the new code resolves time outside the shared chokepoints (frameResolve, buildExportOptions, overlay compose) and route it through them."
+  },
+  {
+    "id": "T003",
+    "query": "Rename the preset id coverStory to gatefold - the label changed anyway.",
+    "should_trigger": true,
+    "reason": "Persisted IDs are forever; a rename needs a canonical-id migration.",
+    "competing_skills": [
+      "persisted-format-migrations"
+    ],
+    "expected_routing": "Keep the persisted ID resolvable, add a canonicalPresetId migration with a test, rename only the user-facing label."
+  },
+  {
+    "id": "T004",
+    "query": "Add a new visual mode for reaction-diffusion.",
+    "should_trigger": true,
+    "reason": "New preset work must follow the purity, chokepoint, ID, and baseline rules.",
+    "competing_skills": [],
+    "expected_routing": "One preset file plus a registry entry, pure in (features, time, params), new matrix cases blessed after visual verification, and every mode-counting surface updated."
+  },
+  {
+    "id": "T005",
+    "query": "Make the render loop faster.",
+    "should_trigger": false,
+    "reason": "Performance work is a different skill, though determinism constrains it.",
+    "competing_skills": [
+      "measured-performance-work"
+    ],
+    "expected_routing": "Route to measured-performance-work; use this skill only if the optimization changes output."
+  }
+]

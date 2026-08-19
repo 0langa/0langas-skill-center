@@ -1,0 +1,46 @@
+[
+  {
+    "id": "T001",
+    "query": "Add a replace_in_file tool to the MCP server.",
+    "should_trigger": true,
+    "reason": "New MCP tool surface - schema, ambiguity policy, and atomicity all apply.",
+    "competing_skills": [],
+    "expected_routing": "Define a single-purpose verb with an explicit schema, confine paths to the workspace root, fail on ambiguous matches, write via temp-and-rename, and add contract plus smoke tests."
+  },
+  {
+    "id": "T002",
+    "query": "A patch left the file half-written when the process was killed.",
+    "should_trigger": true,
+    "reason": "Atomicity and crash recovery in a mutating MCP tool.",
+    "competing_skills": [],
+    "expected_routing": "Move to temp-and-rename with an explicit transaction state machine and a documented recovery path, then cover it with the killed-process fault matrix."
+  },
+  {
+    "id": "T003",
+    "query": "The edit tool picked the wrong occurrence.",
+    "should_trigger": true,
+    "reason": "Ambiguity must be an error, not a guess.",
+    "competing_skills": [],
+    "expected_routing": "Make the exact-string path fail on ambiguity with a typed error naming the candidates, rather than selecting one."
+  },
+  {
+    "id": "T004",
+    "query": "Publish the MCP server so I can install it from the release.",
+    "should_trigger": true,
+    "reason": "Packaging and the smoke-test ladder.",
+    "competing_skills": [
+      "windows-release-ritual"
+    ],
+    "expected_routing": "Set the files allowlist, bin entry and engines floor, run the MCP smoke and package smoke on Windows and Linux, and ship the safety docs the claims rest on."
+  },
+  {
+    "id": "T005",
+    "query": "Configure this MCP server in my Claude Code settings.",
+    "should_trigger": false,
+    "reason": "Client configuration, not server design.",
+    "competing_skills": [
+      "official-ai-devdocs"
+    ],
+    "expected_routing": "Route to the provider docs skill."
+  }
+]

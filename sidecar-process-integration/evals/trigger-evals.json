@@ -1,0 +1,44 @@
+[
+  {
+    "id": "T001",
+    "query": "cargo build fails on a fresh clone of the audio-visualizer with a missing bundled resource.",
+    "should_trigger": true,
+    "reason": "Tauri validates bundled sidecar resources at compile time.",
+    "competing_skills": [],
+    "expected_routing": "Run the fetch and build sidecar scripts (ffmpeg, whisper, onnxruntime, lyrics sidecar) before debugging the Rust build further."
+  },
+  {
+    "id": "T002",
+    "query": "Playlist DL cannot find the Python backend when I run the packaged exe.",
+    "should_trigger": true,
+    "reason": "Dev-versus-packaged sidecar path resolution.",
+    "competing_skills": [],
+    "expected_routing": "Resolve the bundled path in packaged mode, keep the PLAYLISTDL_BACKEND_PATH override for local testing, and produce an actionable message instead of a stack trace."
+  },
+  {
+    "id": "T003",
+    "query": "Parse the ffmpeg progress output to drive the progress bar.",
+    "should_trigger": true,
+    "reason": "Human-facing text is not a protocol.",
+    "competing_skills": [],
+    "expected_routing": "Use a line-delimited JSON event protocol on stdout with an explicit version, logs on stderr, and never parse human-readable progress text."
+  },
+  {
+    "id": "T004",
+    "query": "Cancelling an export leaves an ffmpeg process running.",
+    "should_trigger": true,
+    "reason": "Child-process lifecycle and orphan cleanup.",
+    "competing_skills": [],
+    "expected_routing": "Propagate cancellation, kill the child, remove temp files, and reap orphans from a previous crashed run at startup."
+  },
+  {
+    "id": "T005",
+    "query": "Add a new export resolution preset in the UI.",
+    "should_trigger": false,
+    "reason": "UI feature with no sidecar boundary change.",
+    "competing_skills": [
+      "desktop-app-ux-polish"
+    ],
+    "expected_routing": "Do not trigger."
+  }
+]

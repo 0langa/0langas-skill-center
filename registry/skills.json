@@ -116,6 +116,20 @@
       }
     },
     {
+      "name": "autonomous-work-ledger",
+      "canonical": {
+        "type": "repo",
+        "path": "autonomous-work-ledger"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/autonomous-work-ledger",
+        "kimi": "junction:~/.agents/skills/autonomous-work-ledger",
+        "claude": "junction:~/.claude/skills/autonomous-work-ledger",
+        "vscode": "inherit"
+      }
+    },
+    {
       "name": "brand-guidelines",
       "canonical": {
         "type": "path",
@@ -377,6 +391,48 @@
       "dir": "research-deep"
     },
     {
+      "name": "desktop-app-ux-polish",
+      "canonical": {
+        "type": "repo",
+        "path": "desktop-app-ux-polish"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/desktop-app-ux-polish",
+        "kimi": "junction:~/.agents/skills/desktop-app-ux-polish",
+        "claude": "junction:~/.claude/skills/desktop-app-ux-polish",
+        "vscode": "inherit"
+      }
+    },
+    {
+      "name": "destructive-operation-safety",
+      "canonical": {
+        "type": "repo",
+        "path": "destructive-operation-safety"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/destructive-operation-safety",
+        "kimi": "junction:~/.agents/skills/destructive-operation-safety",
+        "claude": "junction:~/.claude/skills/destructive-operation-safety",
+        "vscode": "inherit"
+      }
+    },
+    {
+      "name": "determinism-and-golden-baselines",
+      "canonical": {
+        "type": "repo",
+        "path": "determinism-and-golden-baselines"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/determinism-and-golden-baselines",
+        "kimi": "junction:~/.agents/skills/determinism-and-golden-baselines",
+        "claude": "junction:~/.claude/skills/determinism-and-golden-baselines",
+        "vscode": "inherit"
+      }
+    },
+    {
       "name": "doc-coauthoring",
       "canonical": {
         "type": "path",
@@ -523,6 +579,20 @@
       }
     },
     {
+      "name": "local-first-scope-guard",
+      "canonical": {
+        "type": "repo",
+        "path": "local-first-scope-guard"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/local-first-scope-guard",
+        "kimi": "junction:~/.agents/skills/local-first-scope-guard",
+        "claude": "junction:~/.claude/skills/local-first-scope-guard",
+        "vscode": "inherit"
+      }
+    },
+    {
       "name": "mcp-builder",
       "canonical": {
         "type": "path",
@@ -539,6 +609,34 @@
         "kimi": "agents/skills",
         "vscode": "agents/skills",
         "claude": "none"
+      }
+    },
+    {
+      "name": "mcp-server-contracts",
+      "canonical": {
+        "type": "repo",
+        "path": "mcp-server-contracts"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/mcp-server-contracts",
+        "kimi": "junction:~/.agents/skills/mcp-server-contracts",
+        "claude": "junction:~/.claude/skills/mcp-server-contracts",
+        "vscode": "inherit"
+      }
+    },
+    {
+      "name": "measured-performance-work",
+      "canonical": {
+        "type": "repo",
+        "path": "measured-performance-work"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/measured-performance-work",
+        "kimi": "junction:~/.agents/skills/measured-performance-work",
+        "claude": "junction:~/.claude/skills/measured-performance-work",
+        "vscode": "inherit"
       }
     },
     {
@@ -614,6 +712,20 @@
         "kimi": "agents",
         "vscode": "agents",
         "claude": "none"
+      }
+    },
+    {
+      "name": "persisted-format-migrations",
+      "canonical": {
+        "type": "repo",
+        "path": "persisted-format-migrations"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/persisted-format-migrations",
+        "kimi": "junction:~/.agents/skills/persisted-format-migrations",
+        "claude": "junction:~/.claude/skills/persisted-format-migrations",
+        "vscode": "inherit"
       }
     },
     {
@@ -722,6 +834,20 @@
       }
     },
     {
+      "name": "repo-quality-gates",
+      "canonical": {
+        "type": "repo",
+        "path": "repo-quality-gates"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/repo-quality-gates",
+        "kimi": "junction:~/.agents/skills/repo-quality-gates",
+        "claude": "junction:~/.claude/skills/repo-quality-gates",
+        "vscode": "inherit"
+      }
+    },
+    {
       "name": "report",
       "canonical": {
         "type": "path",
@@ -818,6 +944,20 @@
         "kimi": "agents",
         "vscode": "agents",
         "claude": "none"
+      }
+    },
+    {
+      "name": "sidecar-process-integration",
+      "canonical": {
+        "type": "repo",
+        "path": "sidecar-process-integration"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/sidecar-process-integration",
+        "kimi": "junction:~/.agents/skills/sidecar-process-integration",
+        "claude": "junction:~/.claude/skills/sidecar-process-integration",
+        "vscode": "inherit"
       }
     },
     {
@@ -1013,6 +1153,20 @@
         "kimi": "agents",
         "vscode": "agents",
         "claude": "none"
+      }
+    },
+    {
+      "name": "windows-release-ritual",
+      "canonical": {
+        "type": "repo",
+        "path": "windows-release-ritual"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "junction:~/.agents/skills/windows-release-ritual",
+        "kimi": "junction:~/.agents/skills/windows-release-ritual",
+        "claude": "junction:~/.claude/skills/windows-release-ritual",
+        "vscode": "inherit"
       }
     },
     {

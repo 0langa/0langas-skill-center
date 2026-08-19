@@ -1,0 +1,48 @@
+[
+  {
+    "id": "T001",
+    "query": "After the theme change the cards are invisible and the shell looks wallpaper-tinted.",
+    "should_trigger": true,
+    "reason": "Painted-output defect that markup review would miss.",
+    "competing_skills": [
+      "winui-design"
+    ],
+    "expected_routing": "Verify the painted result in the running app at 200 percent scale, check brush layering and translucency, and confirm the exe timestamp before trusting what is on screen."
+  },
+  {
+    "id": "T002",
+    "query": "The app will not start since I added the new palette.",
+    "should_trigger": true,
+    "reason": "Resources that do not resolve at parse time fail app start, not one control.",
+    "competing_skills": [],
+    "expected_routing": "Make the palette resolvable at parse time and verify the app launches in both themes."
+  },
+  {
+    "id": "T003",
+    "query": "The scan page list collapses to nothing on my machine.",
+    "should_trigger": true,
+    "reason": "Star-sizing starvation at 200 percent scale inside a scrollable page.",
+    "competing_skills": [
+      "winui-design"
+    ],
+    "expected_routing": "Give the list Min/MaxHeight inside the scrollable page and verify every page at 200 percent."
+  },
+  {
+    "id": "T004",
+    "query": "Add an ETA to the download progress.",
+    "should_trigger": true,
+    "reason": "Progress honesty rule - report the measured rate rather than invent an ETA.",
+    "competing_skills": [],
+    "expected_routing": "Report the measured rate, show an ETA only where the data supports it, and keep pause, resume, cancel, retry and reveal available."
+  },
+  {
+    "id": "T005",
+    "query": "Why is my WinUI Grid using RowDefinitions wrong?",
+    "should_trigger": false,
+    "reason": "XAML control-level question belongs to the WinUI design skill.",
+    "competing_skills": [
+      "winui-design"
+    ],
+    "expected_routing": "Route to winui-design."
+  }
+]

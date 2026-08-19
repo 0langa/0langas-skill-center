@@ -1,0 +1,48 @@
+[
+  {
+    "id": "T001",
+    "query": "I need a new column on the scan results table.",
+    "should_trigger": true,
+    "reason": "SQLite schema change requires a new numbered level, not an edit to a shipped one.",
+    "competing_skills": [],
+    "expected_routing": "Add a new V<N>Statements block plus the chain entry, one atomic transaction stamping its version, add the index the query needs, add a fixture and round-trip test."
+  },
+  {
+    "id": "T002",
+    "query": "Old project files fail to open after the theme refactor.",
+    "should_trigger": true,
+    "reason": "A persisted shape changed without a migration.",
+    "competing_skills": [
+      "determinism-and-golden-baselines"
+    ],
+    "expected_routing": "Identify the changed shape, add the numbered schemaVersion migration, add a fixture for the previous version, and test the full chain."
+  },
+  {
+    "id": "T003",
+    "query": "The turbo scanner started emitting a new field and the C# side crashes on older binaries.",
+    "should_trigger": true,
+    "reason": "Cross-process contract needs versioning and tolerance for the older producer.",
+    "competing_skills": [
+      "sidecar-process-integration"
+    ],
+    "expected_routing": "Version the JSONL contract, make the new field nullable with a per-item fallback, and refuse a producer too old to be safe with a message naming the required version."
+  },
+  {
+    "id": "T004",
+    "query": "Changing one setting wipes the others when two windows are open.",
+    "should_trigger": true,
+    "reason": "Whole-snapshot settings save losing concurrent writes.",
+    "competing_skills": [],
+    "expected_routing": "Move the write to an atomic load-mutate-save for the single key and serialize writes behind the store lock."
+  },
+  {
+    "id": "T005",
+    "query": "Add a tooltip to the settings page.",
+    "should_trigger": false,
+    "reason": "Pure UI change with no persisted shape involved.",
+    "competing_skills": [
+      "desktop-app-ux-polish"
+    ],
+    "expected_routing": "Do not trigger."
+  }
+]
