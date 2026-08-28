@@ -2,6 +2,9 @@
 # Also safe to run if a test round archived the decoys (missing paths are skipped).
 $ErrorActionPreference = 'Continue'
 $A = "$HOME\.agents\skills"
+# Derived, never hardcoded - see plant-traps.ps1.
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$env:SKILLCTL_REGISTRY = Join-Path $RepoRoot 'registry\skills.json'
 
 foreach ($p in @("$A\markdown-toolbox", "$A\pr-review-buddy", "$A\old-python-scripts",
                  "$A\notes-backup.zip", "$A\skills\web-scraper-utils", "$A\draft-formatter",
@@ -13,11 +16,11 @@ foreach ($p in @("$A\markdown-toolbox", "$A\pr-review-buddy", "$A\old-python-scr
 if (Test-Path "$A\legacy-link") { cmd /c rmdir "$A\legacy-link" | Out-Null }
 # restore the tri-client-skill-port claude junction to its correct target
 cmd /c rmdir "$HOME\.claude\skills\tri-client-skill-port" | Out-Null
-cmd /c mklink /J "$HOME\.claude\skills\tri-client-skill-port" "$HOME\source\repos\0langas-skill-center\tri-client-skill-port" | Out-Null
+cmd /c mklink /J "$HOME\.claude\skills\tri-client-skill-port" (Join-Path $RepoRoot "tri-client-skill-port") | Out-Null
 # remove ghost registry entry + any decoy registrations the agent may have added
 python -c @"
 import json, os
-p = os.path.join(os.path.expanduser('~'), 'source/repos/0langas-skill-center/registry/skills.json').replace('/', os.sep)
+p = os.environ['SKILLCTL_REGISTRY']
 r = json.load(open(p, encoding='utf-8'))
 drop = {'ghost-ledger', 'markdown-toolbox', 'pr-review-buddy', 'web-scraper-utils', 'pdf-tools', 'snippet-vault'}
 before = len(r['skills'])

@@ -1091,7 +1091,7 @@
       "name": "usage-pulse",
       "canonical": {
         "type": "path",
-        "path": "~/source/repos/usage-pulse"
+        "path": "~/source/repos/maintained/usage-pulse"
       },
       "upstream": null,
       "install": {
@@ -1200,6 +1200,20 @@
         "kimi": "agents",
         "vscode": "agents",
         "claude": "none"
+      }
+    },
+    {
+      "name": "memory-audit",
+      "canonical": {
+        "type": "path",
+        "path": "~/.agents/skills/memory-audit"
+      },
+      "upstream": null,
+      "install": {
+        "codex": "agents",
+        "kimi": "agents",
+        "claude": "junction:~/.claude/skills/memory-audit",
+        "vscode": "agents"
       }
     }
   ]

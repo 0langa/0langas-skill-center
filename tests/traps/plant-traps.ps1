@@ -4,6 +4,10 @@
 # the one exception is the tri-client-skill-port claude JUNCTION (repointed; restored by remove-traps.ps1 or `skillctl sync --apply`).
 $ErrorActionPreference = 'Stop'
 $A = "$HOME\.agents\skills"
+# Repo location is derived, never hardcoded: the repo has moved before and
+# hardcoded paths silently broke traps 12 and 13.
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$env:SKILLCTL_REGISTRY = Join-Path $RepoRoot 'registry\skills.json'
 
 function Write-Skill($dir, $fmName, $desc) {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -48,12 +52,11 @@ Write-Skill "$HOME\.copilot\skills\snippet-vault" 'snippet-vault' 'Store and ret
 Write-Skill "$A\usage-report" 'pulse:usage-report' 'Older copy of the usage report skill kept around after a manual sync experiment.'
 # 12 wrong-target junction on an expected registry location
 cmd /c rmdir "$HOME\.claude\skills\tri-client-skill-port" | Out-Null
-cmd /c mklink /J "$HOME\.claude\skills\tri-client-skill-port" "$HOME\source\repos\0langas-skill-center\muteman" | Out-Null
+cmd /c mklink /J "$HOME\.claude\skills\tri-client-skill-port" (Join-Path $RepoRoot "muteman") | Out-Null
 # 13 ghost registry entry
 python -c @"
 import json, os
-p = os.path.join(os.environ['HOME'] if 'HOME' in os.environ else os.path.expanduser('~'), 'source/repos/0langas-skill-center/registry/skills.json')
-p = p.replace('/', os.sep)
+p = os.environ['SKILLCTL_REGISTRY']
 r = json.load(open(p, encoding='utf-8'))
 if not any(s['name'] == 'ghost-ledger' for s in r['skills']):
     r['skills'].append({'name': 'ghost-ledger', 'canonical': {'type': 'path', 'path': '~/.agents/skills/ghost-ledger'}, 'upstream': None, 'install': {'codex': 'agents', 'kimi': 'agents', 'claude': 'none', 'vscode': 'agents'}})

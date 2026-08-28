@@ -195,6 +195,10 @@ def make_entry(path, name, container_child):
         "fm": None,
         "is_dir": os.path.isdir(path),
     }
+    # A link whose target no longer exists: isdir() is False, but this is a
+    # repairable broken link, not a stray file. Callers must not archive it
+    # blindly - the registry-side repair pass relinks it.
+    e["dangling"] = e["is_link"] and not os.path.exists(path)
     sk = os.path.join(path, "SKILL.md")
     if e["is_dir"] and os.path.isfile(sk):
         e["fm"] = parse_frontmatter(sk)
@@ -238,10 +242,28 @@ def archive_move(src, reason, dest_name=None, apply=False):
 
 
 def remove_link(path, apply=False):
-    """Remove a junction/symlink itself (never the target)."""
-    if apply:
-        subprocess.run(["cmd", "/c", "rmdir", os.path.normpath(path)], check=True,
-                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    """Remove a junction/symlink itself (never the target).
+
+    Tolerates a dangling link (target gone) and an already-absent path, so a
+    relink of a broken junction cannot fail before it recreates the link.
+    """
+    if not apply:
+        return
+    path = os.path.normpath(path)
+    if not os.path.lexists(path):
+        return
+    r = subprocess.run(["cmd", "/c", "rmdir", path], capture_output=True,
+                       text=True, encoding="utf-8", errors="replace")
+    if r.returncode == 0 or not os.path.lexists(path):
+        return
+    # rmdir refuses some reparse points; remove the link entry directly.
+    for fn in (os.remove, os.rmdir):
+        try:
+            fn(path)
+            return
+        except OSError:
+            continue
+    raise RuntimeError(f"could not remove link {path}: {r.stdout} {r.stderr}")
 
 
 def make_junction(link, target, apply=False):
@@ -262,7 +284,8 @@ def cmd_audit(_args):
     registry = load_registry()
     scan = scan_provider_dirs(registry)
     problems = {k: [] for k in
-                ("missing", "stray", "duplicate", "junction", "validation", "unexpected")}
+                ("missing", "broken", "stray", "duplicate", "junction",
+                 "validation", "unexpected")}
     warnings = []
 
     # 1. scan-dir findings
@@ -270,6 +293,11 @@ def cmd_audit(_args):
         by_fm = {}
         for e in entries:
             skill = match_skill(registry, e, provider)
+            if e["dangling"]:
+                owner = f"'{skill['name']}'" if skill else "no registry owner"
+                problems["broken"].append(
+                    f"[{provider}] dead link {e['path']} -> {os.path.realpath(e['path'])} ({owner})")
+                continue
             if not e["is_dir"]:
                 problems["stray"].append(f"[{provider}] non-skill file in scan dir: {e['path']}")
                 continue
@@ -327,6 +355,10 @@ def cmd_audit(_args):
                     problems["junction"].append(
                         f"[{provider}] '{skill['name']}': junction {loc} targets "
                         f"{os.path.realpath(loc)}, expected {canon}")
+                elif not os.path.exists(loc):
+                    problems["junction"].append(
+                        f"[{provider}] '{skill['name']}': junction {loc} points at "
+                        f"{canon}, which does not exist (stale registry canonical?)")
             elif inst == "inherit":
                 visible = any(
                     match_skill(registry, e, provider) is skill
@@ -365,9 +397,26 @@ def cmd_audit(_args):
 # sync
 # --------------------------------------------------------------------------
 
-def build_plan(registry):
-    """Deterministic reconciliation plan. Identical inputs -> identical plan."""
+def claimed_paths(registry):
+    """Every scan-dir path the registry explicitly maps a skill onto."""
+    out = set()
+    for skill in registry["skills"]:
+        for provider in registry["providers"]:
+            for loc in expected_locations(skill, provider):
+                out.add(norm(loc))
+    return out
+
+
+def build_plan(registry, archive_strays=False):
+    """Deterministic reconciliation plan. Identical inputs -> identical plan.
+
+    archive_strays: also archive unregistered but otherwise valid skills.
+    Off by default - a valid skill that is merely absent from the registry is
+    reported as 'review' so `sync --apply` can never silently remove working
+    skills; use `register` to adopt them.
+    """
     scan = scan_provider_dirs(registry)
+    claimed = claimed_paths(registry)
     actions = []
 
     # strays & duplicates from scan
@@ -381,10 +430,31 @@ def build_plan(registry):
         archived[key] = a
         actions.append(a)
 
+    reviewed = {}  # norm(path) -> action, reported once per path
+
+    def add_review(path, provider, reason):
+        key = norm(path)
+        if key in reviewed:
+            reviewed[key]["provider"] += f",{provider}"
+            return
+        a = {"op": "review", "path": path, "provider": provider, "reason": reason}
+        reviewed[key] = a
+        actions.append(a)
+
     for provider, entries in scan.items():
         by_fm = {}
         for e in entries:
             skill = match_skill(registry, e, provider)
+            if e["dangling"]:
+                # Broken link. If the registry claims this path, the repair
+                # pass below relinks it - archiving here would delete the link
+                # out from under that repair and leave the skill invisible.
+                if skill is not None or norm(e["path"]) in claimed:
+                    continue
+                add_archive(e["path"], provider,
+                            f"dead link with no registry owner "
+                            f"(-> {os.path.realpath(e['path'])})")
+                continue
             if not e["is_dir"]:
                 add_archive(e["path"], provider, "stray non-skill file in scan dir")
                 continue
@@ -395,8 +465,13 @@ def build_plan(registry):
                             "stray directory without SKILL.md, not in registry")
                 continue
             if skill is None:
-                add_archive(e["path"], provider,
-                            f"stray skill '{e['fm']['name']}' not in registry")
+                reason = f"stray skill '{e['fm']['name']}' not in registry"
+                if archive_strays:
+                    add_archive(e["path"], provider, reason)
+                else:
+                    add_review(e["path"], provider,
+                               reason + " - run `register` to adopt it, or "
+                               "`sync --archive-strays` to remove it")
             else:
                 by_fm.setdefault(e["fm"]["name"] or e["name"], []).append(e)
         for _fm, es in sorted(by_fm.items()):
@@ -444,15 +519,25 @@ def build_plan(registry):
                     add_link_action("relink", loc, canon, provider,
                                     f"wrong-target junction for '{skill['name']}' "
                                     f"(now -> {os.path.realpath(loc)})")
-    # deterministic order
-    actions.sort(key=lambda a: (a["op"], a.get("path") or a.get("link") or "", a["provider"]))
+    # An archive must never target a path that a link repair is about to
+    # rebuild: archiving first makes the repair fail and the skill vanish.
+    repaired = {norm(a["link"]) for a in actions if a["op"] in ("junction", "relink")}
+    conflicts = [a for a in actions
+                 if a["op"] == "archive" and norm(a["path"]) in repaired]
+    for a in conflicts:
+        actions.remove(a)
+
+    # deterministic order; repairs before archives so a plan is safe to replay
+    op_rank = {"junction": 0, "relink": 1, "archive": 2, "review": 3, "unfixable": 4}
+    actions.sort(key=lambda a: (op_rank.get(a["op"], 9), a["op"],
+                                a.get("path") or a.get("link") or "", a["provider"]))
     return actions
 
 
 def cmd_sync(args):
     registry = load_registry()
     apply = args.apply
-    actions = build_plan(registry)
+    actions = build_plan(registry, archive_strays=getattr(args, "archive_strays", False))
     if getattr(args, "only", None):
         reg_by_name = {s["name"]: s for s in registry["skills"]}
         sel_paths = set()
@@ -502,6 +587,8 @@ def cmd_sync(args):
                 remove_link(a["link"], apply=True)
                 make_junction(a["link"], a["target"], apply=True)
                 print(f"         relinked {a['link']} -> {a['target']}")
+            elif a["op"] == "review":
+                pass  # reported only; never mutates the filesystem
             elif a["op"] == "unfixable":
                 rc = 1
         except Exception as exc:  # noqa: BLE001 - report and continue
@@ -608,6 +695,10 @@ def cmd_verify(args):
                     if link_target(loc) != norm(canon):
                         failures.append(f"[{provider}] '{skill['name']}': junction {loc} "
                                         f"targets {os.path.realpath(loc)} != {canon}")
+                        continue
+                    if not os.path.exists(loc):
+                        failures.append(f"[{provider}] '{skill['name']}': junction {loc} "
+                                        f"is dead - target {canon} does not exist")
                         continue
                 if bundle:
                     if not os.path.isdir(loc):
@@ -1227,6 +1318,9 @@ def main(argv=None):
     sp.add_argument("--apply", action="store_true", help="execute the plan")
     sp.add_argument("--only", nargs="+", metavar="PATH-OR-NAME",
                     help="restrict the plan to actions matching these paths or skill names")
+    sp.add_argument("--archive-strays", action="store_true",
+                    help="also archive valid skills that are missing from the registry "
+                         "(default: report them as 'review' and leave them in place)")
 
     vp = sub.add_parser("verify", help="every registry skill resolves at every mapped location")
     vp.add_argument("--ci", action="store_true",
