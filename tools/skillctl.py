@@ -39,6 +39,15 @@ AGENTS_DIR = os.path.expanduser("~/.agents/skills")
 KIMI_DIR = os.path.expanduser("~/.kimi-code/skills")
 CLAUDE_PLUGINS_JSON = os.path.expanduser("~/.claude/plugins/installed_plugins.json")
 
+# Provenance. The repo is a personal skill collection: only skills authored
+# here may live inside it. Third-party skills are tracked by the registry but
+# always stay outside the repo, under a provider directory or their own repo.
+#   mine     - authored by the repo owner; may use canonical type "repo"
+#   vendored - written by someone else; must live outside this repo
+#   unknown  - authorship not yet established; treated as "not mine"
+ORIGINS = ("mine", "vendored", "unknown")
+FOREIGN_ORIGINS = ("vendored", "unknown")
+
 # install-value bases (relative skill location inside a provider-visible tree)
 BASE_INSTALLS = {
     "agents": AGENTS_DIR,
@@ -133,6 +142,38 @@ def load_registry():
 
 def skill_dir_name(skill):
     return skill.get("dir", skill["name"])
+
+
+def skill_origin(skill):
+    return skill.get("origin", "unknown")
+
+
+def check_origin_invariants(registry):
+    """Provenance rules. Returns (failures, unknowns).
+
+    The hard rule: a skill the owner did not write never lives inside this
+    repo. Enforced here rather than by convention, because `update --apply`
+    and `register` both write to a skill's canonical path.
+    """
+    failures, unknowns = [], []
+    for skill in registry.get("skills", []):
+        name = skill.get("name", "<unnamed>")
+        origin = skill.get("origin")
+        if origin is None:
+            failures.append(f"'{name}': missing 'origin' (one of {', '.join(ORIGINS)})")
+            continue
+        if origin not in ORIGINS:
+            failures.append(f"'{name}': invalid origin '{origin}' "
+                            f"(expected one of {', '.join(ORIGINS)})")
+            continue
+        if origin in FOREIGN_ORIGINS:
+            if (skill.get("canonical") or {}).get("type") == "repo":
+                failures.append(
+                    f"'{name}': origin '{origin}' but canonical type is 'repo' - "
+                    f"only skills with origin 'mine' may live inside this repo")
+            if origin == "unknown":
+                unknowns.append(name)
+    return failures, unknowns
 
 
 def canonical_path(skill, repo_root=REPO_ROOT):
@@ -285,8 +326,16 @@ def cmd_audit(_args):
     scan = scan_provider_dirs(registry)
     problems = {k: [] for k in
                 ("missing", "broken", "stray", "duplicate", "junction",
-                 "validation", "unexpected")}
+                 "provenance", "validation", "unexpected")}
     warnings = []
+
+    origin_failures, origin_unknowns = check_origin_invariants(registry)
+    problems["provenance"].extend(origin_failures)
+    if origin_unknowns:
+        warnings.append(
+            f"[registry] {len(origin_unknowns)} skill(s) with origin 'unknown' - "
+            f"set each to 'mine' or 'vendored' so provenance is explicit: "
+            + ", ".join(origin_unknowns))
 
     # 1. scan-dir findings
     for provider, entries in scan.items():
@@ -643,6 +692,8 @@ def cmd_verify_ci():
     for n, c in sorted(names.items()):
         if c > 1:
             failures.append(f"duplicate registry name: '{n}' ({c}x)")
+    origin_failures, _ = check_origin_invariants(registry)
+    failures.extend(origin_failures)
 
     print("skillctl verify --ci (repo-local checks only)")
     for f_ in failures:
@@ -884,8 +935,8 @@ def home_rel(path):
     p = os.path.normpath(os.path.abspath(path))
     home = os.path.normpath(os.path.expanduser("~"))
     if norm(p).startswith(norm(home) + os.sep):
-        return "~" + p[len(home):]
-    return p
+        p = "~" + p[len(home):]
+    return p.replace(os.sep, "/")
 
 
 def find_unregistered(registry):
@@ -932,16 +983,27 @@ def infer_install(real_path):
         install["kimi"] = "kimi"
     elif rp.startswith(claude + os.sep):
         install["claude"] = "path:" + home_rel(real_path)
+    if install["claude"] == "none":
+        # already exposed to Claude Code by an existing junction?
+        cand = os.path.join(os.path.expanduser("~/.claude/skills"),
+                            os.path.basename(real_path.rstrip(os.sep)))
+        if is_link(cand) and link_target(cand) == rp:
+            install["claude"] = "junction:" + home_rel(cand)
     return install
 
 
-def build_path_entry(path, upstream):
-    """Registry entry for a skill directory (used by register/discover --fetch)."""
+def build_path_entry(path, upstream, origin="unknown"):
+    """Registry entry for a skill directory (used by register/discover --fetch).
+
+    Always a path canonical, never a repo canonical: adopting an existing skill
+    records where it already lives, it never copies it into this repo.
+    """
     sk = os.path.join(path, "SKILL.md")
     fm = parse_frontmatter(sk)
     real = link_target(path)
     name = fm["name"] or os.path.basename(path)
     entry = {"name": name,
+             "origin": origin,
              "canonical": {"type": "path", "path": home_rel(real)},
              "upstream": upstream,
              "install": infer_install(real)}
@@ -988,12 +1050,13 @@ def _cmd_register_impl(args):
             print(f"  skip  '{name}': already registered "
                   f"(canonical: {canonical_path(existing[0])})")
             continue
-        rows.append(build_path_entry(p, upstream))
+        rows.append(build_path_entry(p, upstream, getattr(args, "origin", "unknown")))
 
     print(f"skillctl register ({mode}) - {len(rows)} skill(s) to add")
     for e in rows:
         vis = sorted({v for v in e["install"].values() if v != "none"})
-        print(f"  add '{e['name']}'  canonical={e['canonical']['path']}  install={vis}")
+        print(f"  add '{e['name']}'  origin={e['origin']}  "
+              f"canonical={e['canonical']['path']}  install={vis}")
         if e["upstream"]:
             print(f"       upstream: github {e['upstream']['repo']}:{e['upstream']['subpath']}")
     if not rows:
@@ -1338,6 +1401,9 @@ def main(argv=None):
                     help="list unregistered skills found in provider scan dirs (read-only)")
     rg.add_argument("--upstream", metavar="OWNER/REPO[:SUBPATH]",
                     help="record a github upstream for the registered skill(s)")
+    rg.add_argument("--origin", choices=ORIGINS, default="unknown",
+                    help="who wrote these skills: 'mine', 'vendored' (someone else, "
+                         "tracked but never stored in this repo), or 'unknown' (default)")
     rg.add_argument("--dry-run", action="store_true",
                     help="show what would be registered without writing (default when no --apply)")
     rg.add_argument("--apply", action="store_true", help="write the registry")

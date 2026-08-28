@@ -11,6 +11,31 @@ This repo is intended to grow into a broader skill center, not a single-purpose 
 - Repo-local `.claude/skills/`, `.kimi-code/skills/`, `.codex/skills/` link the skills for working inside this repo itself.
 - `registry/skills.json` + `tools/skillctl.py` manage and verify that link layout — see "Skill management system" below.
 
+## Provenance
+
+This repo holds only skills written by its owner. Skills written by other people
+are still managed here — the registry tracks them, `sync` links them, `verify`
+checks them, `update` refreshes them — but their files always stay outside the
+repo, under `~/.agents/skills/` or their own upstream repo.
+
+Every entry in `registry/skills.json` declares an `origin`:
+
+| `origin` | Meaning | Where the files may live |
+| --- | --- | --- |
+| `mine` | Written by the repo owner | Anywhere, including a top-level folder in this repo (`canonical.type: "repo"`) |
+| `vendored` | Written by someone else, deliberately adopted | Outside this repo only |
+| `unknown` | Authorship not yet established | Outside this repo only |
+
+The rule is enforced, not just documented: `verify --ci` fails if any entry is
+missing an `origin`, carries an unrecognized one, or pairs a non-`mine` origin
+with `canonical.type: "repo"`. CI runs that check on every push, so a
+third-party skill cannot be committed into this repo by accident.
+
+`register` writes a path canonical, never a repo canonical, so adopting a skill
+records where it already lives instead of copying it in. Pass
+`--origin mine|vendored` when adopting; entries left `unknown` are listed as an
+audit warning until they are classified.
+
 ## Skills
 
 | Skill | Purpose | Provider compatibility |
@@ -49,10 +74,10 @@ This repo is the management hub for skills installed across Codex CLI, Claude Co
 - `registry/skills.json` is the machine-readable source of truth: provider scan layouts (encoded as data), every known skill, its canonical location, its optional GitHub upstream, and its per-provider install method (`agents`, `agents/skills`, `kimi`, `junction:<path>`, `plugin:<id>`, `inherit`, `none`).
 - `tools/skillctl.py` (Python 3.11+, stdlib only) reconciles reality to the registry:
   - `python tools/skillctl.py audit` — scan all provider scan dirs and report missing installs, strays, duplicates, broken/wrong-target junctions, and frontmatter validation errors (exit 1 on any problem).
-  - `python tools/skillctl.py sync [--plan|--apply] [--only <path-or-name>...]` — plan (default) or apply reconciliation: create/repair junctions, and move anything that must be removed into `_archive/` (never delete). Idempotent. `--only` limits the plan to selected paths/skills for per-item repairs.
+  - `python tools/skillctl.py sync [--plan|--apply] [--only <path-or-name>...]` — plan (default) or apply reconciliation: create/repair junctions, and move anything that must be removed into `_archive/` (never delete). Idempotent. A valid skill that is merely missing from the registry is reported as `review` and left alone; `--archive-strays` opts in to removing those. `--only` limits the plan to selected paths/skills for per-item repairs.
   - `python tools/skillctl.py verify [--ci]` — every registry skill resolves at every mapped location with valid frontmatter (exit non-zero on failure). `--ci` runs repo-local checks only (no home-dir access) and is what CI runs.
   - `python tools/skillctl.py update [--skill <name>] [--apply]` — refresh skills with a GitHub upstream: skip when the cached commit is unchanged (`registry/.upstream-cache.json`), otherwise snapshot the state, archive the old canonical, and replace it with the upstream subpath.
-  - `python tools/skillctl.py register [--scan] [<path>...] [--upstream OWNER/REPO[:SUBPATH]] [--apply]` — adopt newly installed skills into the registry: `--scan` lists unregistered skills across provider dirs; path-based registration infers the per-provider install map automatically.
+  - `python tools/skillctl.py register [--scan] [<path>...] [--upstream OWNER/REPO[:SUBPATH]] [--origin mine|vendored|unknown] [--apply]` — adopt newly installed skills into the registry: `--scan` lists unregistered skills across provider dirs; path-based registration infers the per-provider install map automatically and always records a path canonical, never a repo one. `--origin` records authorship (see "Provenance").
   - `python tools/skillctl.py discover [--fetch <name>...] [--apply]` — list skills that exist in known upstream GitHub repos but are not registered; `--fetch` downloads one into `~/.agents/skills/` and registers it with its upstream recorded.
   - `python tools/skillctl.py unregister <name>... [--archive-canonical] [--apply]` — remove registry entries (files stay by default; `--archive-canonical` also archives the canonical copy; repo-managed skills refused).
   - `python tools/skillctl.py snapshot [--label <text>]` — write registry + link map + skill listing to `_archive/snapshots/<timestamp>/` (also runs automatically before `update --apply`).
