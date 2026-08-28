@@ -508,7 +508,7 @@
         "codex": "agents",
         "kimi": "agents",
         "vscode": "agents",
-        "claude": "none"
+        "claude": "junction:~/.claude/skills/docx"
       }
     },
     {
