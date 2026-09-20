@@ -34,57 +34,7 @@
       "link": "junction-ok"
     }
   },
-  "containers": {
-    "~/.agents/skills/skills": "Mirror of the anthropics/skills repo layout; each immediate subdirectory is a skill (registry install value 'agents/skills')."
-  },
   "skills": [
-    {
-      "name": "add-fields",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/research-add-fields"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      },
-      "dir": "research-add-fields"
-    },
-    {
-      "name": "add-items",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/research-add-items"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      },
-      "dir": "research-add-items"
-    },
-    {
-      "name": "addon-archive",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/addon-archive"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
     {
       "name": "agent-install-sync",
       "origin": "mine",
@@ -101,26 +51,6 @@
       }
     },
     {
-      "name": "algorithmic-art",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/skills/algorithmic-art"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/algorithmic-art",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
-      }
-    },
-    {
       "name": "autonomous-work-ledger",
       "origin": "mine",
       "canonical": {
@@ -133,66 +63,6 @@
         "kimi": "junction:~/.agents/skills/autonomous-work-ledger",
         "claude": "junction:~/.claude/skills/autonomous-work-ledger",
         "vscode": "inherit"
-      }
-    },
-    {
-      "name": "brand-guidelines",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/skills/brand-guidelines"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/brand-guidelines",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "canvas-design",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/skills/canvas-design"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/canvas-design",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "cavecrew",
-      "origin": "mine",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/cavecrew"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "JuliusBrussee/caveman",
-        "subpath": "skills/cavecrew",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
       }
     },
     {
@@ -216,26 +86,6 @@
       }
     },
     {
-      "name": "caveman-commit",
-      "origin": "mine",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/caveman-commit"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "JuliusBrussee/caveman",
-        "subpath": "skills/caveman-commit",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
       "name": "caveman-compress",
       "origin": "mine",
       "canonical": {
@@ -246,46 +96,6 @@
         "type": "github",
         "repo": "JuliusBrussee/caveman",
         "subpath": "skills/caveman-compress",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "caveman-help",
-      "origin": "mine",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/caveman-help"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "JuliusBrussee/caveman",
-        "subpath": "skills/caveman-help",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "caveman-review",
-      "origin": "mine",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/caveman-review"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "JuliusBrussee/caveman",
-        "subpath": "skills/caveman-review",
         "ref": "main"
       },
       "install": {
@@ -331,56 +141,6 @@
       }
     },
     {
-      "name": "ci-failure-diagnosis",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/ci-failure-diagnosis"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "claude-api",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/skills/claude-api"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/claude-api",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "cli-creator",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/cli-creator"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
       "name": "debug-reproduce-fix",
       "origin": "unknown",
       "canonical": {
@@ -394,22 +154,6 @@
         "vscode": "agents",
         "claude": "none"
       }
-    },
-    {
-      "name": "deep",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/research-deep"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      },
-      "dir": "research-deep"
     },
     {
       "name": "desktop-app-ux-polish",
@@ -461,7 +205,7 @@
       "origin": "vendored",
       "canonical": {
         "type": "path",
-        "path": "~/.agents/skills/skills/doc-coauthoring"
+        "path": "~/.agents/skills/doc-coauthoring"
       },
       "upstream": {
         "type": "github",
@@ -470,9 +214,9 @@
         "ref": "main"
       },
       "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
+        "codex": "agents",
+        "kimi": "agents",
+        "vscode": "agents",
         "claude": "none"
       }
     },
@@ -489,26 +233,6 @@
         "kimi": "agents",
         "vscode": "agents",
         "claude": "none"
-      }
-    },
-    {
-      "name": "docx",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/docx"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/docx",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "junction:~/.claude/skills/docx"
       }
     },
     {
@@ -531,7 +255,7 @@
       "origin": "vendored",
       "canonical": {
         "type": "path",
-        "path": "~/.agents/skills/skills/frontend-design"
+        "path": "~/.agents/skills/frontend-design"
       },
       "upstream": {
         "type": "github",
@@ -539,36 +263,6 @@
         "subpath": "skills/frontend-design",
         "ref": "main"
       },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "gh-address-comments",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/gh-address-comments"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "gh-fix-ci",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/gh-fix-ci"
-      },
-      "upstream": null,
       "install": {
         "codex": "agents",
         "kimi": "agents",
@@ -592,26 +286,6 @@
       }
     },
     {
-      "name": "internal-comms",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/skills/internal-comms"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/internal-comms",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
-      }
-    },
-    {
       "name": "local-first-scope-guard",
       "origin": "mine",
       "canonical": {
@@ -624,26 +298,6 @@
         "kimi": "junction:~/.agents/skills/local-first-scope-guard",
         "claude": "junction:~/.claude/skills/local-first-scope-guard",
         "vscode": "inherit"
-      }
-    },
-    {
-      "name": "mcp-builder",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/skills/mcp-builder"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/mcp-builder",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
       }
     },
     {
@@ -737,26 +391,6 @@
       }
     },
     {
-      "name": "pdf",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/pdf"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/pdf",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
       "name": "persisted-format-migrations",
       "origin": "mine",
       "canonical": {
@@ -779,41 +413,6 @@
         "path": "~/.agents/skills/playwright"
       },
       "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "playwright-interactive",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/playwright-interactive"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "pptx",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/pptx"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/pptx",
-        "ref": "main"
-      },
       "install": {
         "codex": "agents",
         "kimi": "agents",
@@ -854,21 +453,6 @@
       "dir": "using-pulse"
     },
     {
-      "name": "python-uv-project",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/python-uv-project"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
       "name": "repo-intake-project-map",
       "origin": "unknown",
       "canonical": {
@@ -899,102 +483,11 @@
       }
     },
     {
-      "name": "report",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/research-report"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      },
-      "dir": "research-report"
-    },
-    {
-      "name": "research",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/research"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "ruff",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/ruff"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
       "name": "security-best-practices",
       "origin": "unknown",
       "canonical": {
         "type": "path",
         "path": "~/.agents/skills/security-best-practices"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "security-secrets-mcp",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/security-secrets-mcp"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "security-threat-model",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/security-threat-model"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "semgrep",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/semgrep"
       },
       "upstream": null,
       "install": {
@@ -1035,26 +528,6 @@
       }
     },
     {
-      "name": "skill-creator",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/skills/skill-creator"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/skill-creator",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
-      }
-    },
-    {
       "name": "skill-doctor",
       "origin": "mine",
       "canonical": {
@@ -1085,26 +558,6 @@
       }
     },
     {
-      "name": "slack-gif-creator",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/skills/slack-gif-creator"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/slack-gif-creator",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
-      }
-    },
-    {
       "name": "test-regression-guard",
       "origin": "unknown",
       "canonical": {
@@ -1124,7 +577,7 @@
       "origin": "vendored",
       "canonical": {
         "type": "path",
-        "path": "~/.agents/skills/skills/theme-factory"
+        "path": "~/.agents/skills/theme-factory"
       },
       "upstream": {
         "type": "github",
@@ -1133,9 +586,9 @@
         "ref": "main"
       },
       "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
+        "codex": "agents",
+        "kimi": "agents",
+        "vscode": "agents",
         "claude": "none"
       }
     },
@@ -1172,46 +625,6 @@
       "note": "Plugin project; its skills live in skills/usage-report and skills/using-pulse subdirs (no top-level SKILL.md). Junction exposes the whole repo."
     },
     {
-      "name": "web-artifacts-builder",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/skills/web-artifacts-builder"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/web-artifacts-builder",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "webapp-testing",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/skills/webapp-testing"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/webapp-testing",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents/skills",
-        "kimi": "agents/skills",
-        "vscode": "agents/skills",
-        "claude": "none"
-      }
-    },
-    {
       "name": "windows-powershell",
       "origin": "unknown",
       "canonical": {
@@ -1242,41 +655,6 @@
       }
     },
     {
-      "name": "winui-app",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/winui-app"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
-      "name": "xlsx",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/xlsx"
-      },
-      "upstream": {
-        "type": "github",
-        "repo": "anthropics/skills",
-        "subpath": "skills/xlsx",
-        "ref": "main"
-      },
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "vscode": "agents",
-        "claude": "none"
-      }
-    },
-    {
       "name": "memory-audit",
       "origin": "unknown",
       "canonical": {
@@ -1288,246 +666,6 @@
         "codex": "agents",
         "kimi": "agents",
         "claude": "junction:~/.claude/skills/memory-audit",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "animate",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/animate"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/animate",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "animate-expo",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/animate-expo"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/animate-expo",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "animation-vocabulary",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/animation-vocabulary"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/animation-vocabulary",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "apple-design",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/apple-design"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/apple-design",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "ask-sonner",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/ask-sonner"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/ask-sonner",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "emil-design-eng",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/emil-design-eng"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/emil-design-eng",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "find-animation-opportunities",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/find-animation-opportunities"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/find-animation-opportunities",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "improve-animations",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/improve-animations"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/improve-animations",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "pick-ui-library",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/pick-ui-library"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/pick-ui-library",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "prototype",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/prototype"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/prototype",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "review-animations",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/review-animations"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/review-animations",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "write-swift",
-      "origin": "vendored",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/write-swift"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/write-swift",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "webgpu",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/webgpu"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/webgpu",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "winui-design",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/winui-design"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/winui-design",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "dotnet-accessibility",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/dotnet-accessibility"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/dotnet-accessibility",
-        "vscode": "agents"
-      }
-    },
-    {
-      "name": "dotnet-wpf-modern",
-      "origin": "unknown",
-      "canonical": {
-        "type": "path",
-        "path": "~/.agents/skills/dotnet-wpf-modern"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "agents",
-        "kimi": "agents",
-        "claude": "junction:~/.claude/skills/dotnet-wpf-modern",
         "vscode": "agents"
       }
     }
