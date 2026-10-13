@@ -382,5 +382,57 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertEqual(sb.run("unregister", "beta", "--apply").returncode, 0)
 
 
+class VerifyCiTest(unittest.TestCase):
+    """verify --ci checks what the repo guarantees, never the machine."""
+
+    def run_ci(self, skillctl, home):
+        env = dict(os.environ, SKILLCTL_HOME=str(home))
+        return subprocess.run([sys.executable, str(skillctl), "verify", "--ci"],
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", env=env)
+
+    def test_this_repo_passes_on_a_machine_with_no_skills_installed(self):
+        with tempfile.TemporaryDirectory() as empty:
+            r = self.run_ci(SKILLCTL, Path(empty) / "no-such-home")
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_machine_state_is_not_a_failure(self):
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.add_path_skill("beta", create=False)  # third-party, not installed here
+        sb.write_registry()
+        r = self.run_ci(sb.repo / "tools" / "skillctl.py", sb.root / "no-such-home")
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_reports_registry_and_content_problems(self):
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.add_repo_skill("renamed")
+        write_skill(sb.repo / "renamed", "old-name")
+        write_skill(sb.repo / "orphan", "orphan")
+        del sb.add_path_skill("no-origin")["origin"]
+        sb.add_path_skill("bad-method")["install"]["kimi"] = "symlink"
+        sb.add_path_skill("invisible")["install"]["claude"] = "agents"
+        sb.add_path_skill("squatter")["install"]["claude"] = "junction:~/.claude/skills/alpha"
+        sb.add_path_skill("escapes")["canonical"] = {"type": "repo", "path": "../outside"}
+        sb.write_registry()
+
+        r = self.run_ci(sb.repo / "tools" / "skillctl.py", sb.home)
+        self.assertEqual(r.returncode, 1)
+        failures = [line.strip() for line in r.stdout.splitlines() if "FAIL:" in line]
+        for needle in (
+            "'renamed': ",
+            "orphan/: skill directory is not in the registry",
+            "'no-origin': missing 'origin'",
+            "'bad-method': [kimi] unknown install method 'symlink'",
+            "'invisible': [claude] agents puts it in",
+            "'squatter': [claude]",
+            "'escapes': repo canonical '../outside' must be a path inside the repo",
+        ):
+            self.assertTrue(any(needle in f for f in failures), f"no failure for {needle!r}")
+        self.assertFalse([f for f in failures if f.startswith("FAIL: 'alpha'")],
+                         "the valid entry was flagged")
+
+
 if __name__ == "__main__":
     unittest.main()

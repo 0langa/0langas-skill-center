@@ -747,51 +747,135 @@ def cmd_sync(args):
 # verify
 # --------------------------------------------------------------------------
 
-def cmd_verify_ci():
-    """CI-safe verify: repo-local invariants only, no provider/home scan."""
-    failures = []
-    try:
-        registry = load_registry()
-    except (OSError, json.JSONDecodeError) as exc:
-        print("skillctl verify --ci (repo-local checks only)")
-        print(f"  FAIL: registry does not parse: {exc}")
-        return 1
+def registry_failures(registry):
+    """Registry invariants that hold on any machine.
 
-    names = {}
-    for i, s in enumerate(registry.get("skills", [])):
-        for field in ("name", "canonical", "install"):
-            if field not in s:
-                failures.append(f"skill #{i}: missing required field '{field}'")
-        name = s.get("name")
+    Shape, install methods, that every mapped location is somewhere its
+    provider scans, one owner per location, unique names, and provenance.
+    Path strings only - nothing here touches the filesystem.
+    """
+    providers = registry.get("providers")
+    skills = registry.get("skills")
+    if not isinstance(providers, dict) or not providers:
+        return ["registry: 'providers' must be a non-empty map"]
+    if not isinstance(skills, list):
+        return ["registry: 'skills' must be a list"]
+    failures = []
+    scan_dirs = {}
+    for provider, conf in providers.items():
+        scans = (conf or {}).get("scan")
+        if not isinstance(scans, list) or not scans:
+            failures.append(f"provider '{provider}': 'scan' must list at least one directory")
+            scans = []
+        scan_dirs[provider] = {norm(expand_home(s)) for s in scans}
+    containers = {norm(expand_home(c)) for c in registry.get("containers", {})}
+
+    names, owners = {}, {}
+    for i, s in enumerate(skills):
+        name = s.get("name") if isinstance(s, dict) else None
         if not name:
+            failures.append(f"skill #{i}: missing 'name'")
             continue
         names[name] = names.get(name, 0) + 1
-        canon = s.get("canonical") or {}
-        if canon.get("type") == "repo":
-            p = os.path.normpath(str(REPO_ROOT / canon.get("path", "")))
-            sk = os.path.join(p, "SKILL.md")
-            if not os.path.isfile(sk):
-                failures.append(f"'{name}': repo-canonical skill missing SKILL.md at {p}")
+        canon = s.get("canonical")
+        if (not isinstance(canon, dict) or canon.get("type") not in ("repo", "path")
+                or not canon.get("path")):
+            failures.append(f"'{name}': canonical must be "
+                            "{\"type\": \"repo\" or \"path\", \"path\": <path>}")
+        elif canon["type"] == "repo":
+            p = str(canon["path"])
+            if os.path.isabs(p) or p.startswith("~") or ".." in re.split(r"[\\/]", p):
+                failures.append(f"'{name}': repo canonical '{p}' must be a path inside the repo")
+        install = s.get("install")
+        if not isinstance(install, dict):
+            failures.append(f"'{name}': 'install' must map providers to install methods")
+            continue
+        for provider in sorted(install):
+            value = install[provider]
+            if provider not in providers:
+                failures.append(f"'{name}': install names unknown provider '{provider}'")
+                continue
+            target = value.split(":", 1)[1] if isinstance(value, str) and ":" in value else ""
+            if value in BASE_INSTALLS:
+                loc = os.path.join(BASE_INSTALLS[value], skill_dir_name(s))
+            elif isinstance(value, str) and value.startswith(("junction:", "path:")) and target:
+                loc = expand_home(target)
+            elif value in ("inherit", "none") or (
+                    isinstance(value, str) and value.startswith("plugin:") and target):
+                continue
             else:
-                fm = parse_frontmatter(sk)
-                if fm["error"]:
-                    failures.append(f"'{name}': {sk}: {fm['error']}")
-        install = s.get("install") or {}
-        if any(v in BASE_INSTALLS for v in install.values()):
-            cpath = canonical_path(s)
-            if not os.path.isdir(cpath):
-                failures.append(f"'{name}': agents-family install but canonical "
-                                f"path does not exist: {cpath}")
+                failures.append(f"'{name}': [{provider}] unknown install method {value!r}")
+                continue
+            parent = os.path.dirname(loc)
+            if norm(parent) not in scan_dirs[provider] | containers:
+                failures.append(f"'{name}': [{provider}] {value} puts it in {parent}, "
+                                f"which {provider} does not scan")
+            owner = owners.setdefault(norm(loc), name)
+            if owner != name:
+                failures.append(f"'{name}': [{provider}] {loc} is already claimed by '{owner}'")
     for n, c in sorted(names.items()):
         if c > 1:
             failures.append(f"duplicate registry name: '{n}' ({c}x)")
-    origin_failures, _ = check_origin_invariants(registry)
-    failures.extend(origin_failures)
+    failures.extend(check_origin_invariants(registry)[0])
+    return failures
 
+
+def repo_content_failures(registry):
+    """Every repo-canonical skill is here with frontmatter that names it, and
+    every skill directory in the repo is registered as one."""
+    failures = []
+    registered = set()
+    for s in registry.get("skills", []):
+        canon = s.get("canonical") if isinstance(s, dict) else None
+        if not (isinstance(canon, dict) and canon.get("type") == "repo"
+                and canon.get("path") and s.get("name")):
+            continue
+        p = canonical_path(s)
+        registered.add(norm(p))
+        if s.get("bundle"):
+            if not os.path.isdir(p):
+                failures.append(f"'{s['name']}': repo-canonical bundle missing at {p}")
+            continue
+        sk = os.path.join(p, "SKILL.md")
+        if not os.path.isfile(sk):
+            failures.append(f"'{s['name']}': repo-canonical skill missing SKILL.md at {p}")
+            continue
+        fm = parse_frontmatter(sk)
+        if fm["error"]:
+            failures.append(f"'{s['name']}': {sk}: {fm['error']}")
+        elif fm["name"] != s["name"]:
+            failures.append(f"'{s['name']}': {sk} names itself '{fm['name']}'")
+    for entry in sorted(os.listdir(REPO_ROOT)):
+        d = REPO_ROOT / entry
+        if (d / "SKILL.md").is_file() and norm(d) not in registered:
+            failures.append(f"{entry}/: skill directory is not in the registry "
+                            f"(register it with origin 'mine' and canonical type 'repo')")
+    return failures
+
+
+def cmd_verify_ci():
+    """CI-safe verify: what the repo itself guarantees, on any machine.
+
+    Never reads the home directory or provider scan dirs. Whether a skill
+    that lives outside the repo is installed on this machine is a question
+    for `verify` and `audit`, not for CI.
+    """
     print("skillctl verify --ci (repo-local checks only)")
+    try:
+        registry = load_registry()
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"  FAIL: registry does not parse: {exc}")
+        return 1
+    if not isinstance(registry, dict):
+        print("  FAIL: registry must be a JSON object")
+        return 1
+    failures = registry_failures(registry)
+    if isinstance(registry.get("skills"), list):
+        failures += repo_content_failures(registry)
     for f_ in failures:
         print(f"  FAIL: {f_}")
-    print(f"checked {len(registry.get('skills', []))} registry entrie(s): {len(failures)} failure(s)")
+    print(f"checked {len(registry.get('skills') or [])} registry entries: "
+          f"{len(failures)} failure(s)")
     return 1 if failures else 0
 
 
