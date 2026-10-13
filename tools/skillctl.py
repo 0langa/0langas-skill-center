@@ -1055,7 +1055,7 @@ def cmd_update(args):
             print(f"  ERROR '{skill['name']}': ls-remote failed: {exc}")
             continue
         cached = cache.get(skill["name"], {})
-        if cached.get("commit") == commit:
+        if cached.get("commit") == commit and os.path.isdir(canon):
             print(f"  skip  '{skill['name']}': upstream unchanged at {commit[:12]}")
             continue
         with tempfile.TemporaryDirectory(prefix="skillctl-") as tmp:
@@ -1080,13 +1080,23 @@ def cmd_update(args):
                 continue
             print(f"  [{mode}] update '{skill['name']}': {repo}/{subpath}@{ref} "
                   f"commit {cached.get('commit', '<none>')[:12] if cached else '<none>'} -> {commit[:12]}")
-            print(f"         canonical: {canon}")
+            print(f"         canonical: {canon}" + ("" if cur_hash else " (not on this machine)"))
             if apply:
-                dest = archive_move(canon, f"upstream refresh of '{skill['name']}' from {repo}@{commit[:12]}",
-                                    dest_name=f"upstream-{skill_dir_name(skill)}", apply=True)
-                print(f"         archived old canonical -> {dest}")
-                os.makedirs(canon, exist_ok=True)
-                shutil.copytree(src, canon, dirs_exist_ok=True)
+                dest = None
+                try:
+                    if os.path.lexists(canon):
+                        dest = archive_move(
+                            canon, f"upstream refresh of '{skill['name']}' from {repo}@{commit[:12]}",
+                            dest_name=f"upstream-{skill_dir_name(skill)}", apply=True)
+                        print(f"         archived old canonical -> {dest}")
+                    os.makedirs(canon, exist_ok=True)
+                    shutil.copytree(src, canon, dirs_exist_ok=True)
+                except Exception as exc:  # noqa: BLE001 - report, keep going, keep the cache
+                    rc = 1
+                    print(f"  ERROR '{skill['name']}': update failed: {exc}")
+                    if dest:
+                        print(f"         the previous canonical is in {dest}")
+                    continue
                 new_cache[skill["name"]] = {"commit": commit, "hash": up_hash,
                                             "repo": repo, "subpath": subpath, "ref": ref}
                 print(f"         replaced canonical with upstream content")

@@ -8,6 +8,9 @@ decoy - never to the real ~/.agents, ~/.claude or ~/.kimi-code installs.
 Run from the repo root:  python -m unittest discover -s tests -v
 """
 
+import contextlib
+import importlib.util
+import io
 import json
 import os
 import re
@@ -18,6 +21,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLCTL = REPO_ROOT / "tools" / "skillctl.py"
@@ -453,6 +457,74 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertTrue((sb.agents("beta") / "SKILL.md").is_file(), "unregister must keep files")
         # running it again is a no-op
         self.assertEqual(sb.run("unregister", "beta", "--apply").returncode, 0)
+
+
+class UpdateTest(unittest.TestCase):
+    """update against a fake GitHub: git is stubbed, nothing leaves the machine."""
+
+    def run_update(self, sb, upstream_tree, commit="c0ffee0000000000000000000000000000000001"):
+        real_run = subprocess.run
+
+        def fake_run(cmd, *args, **kwargs):
+            if list(cmd[:2]) == ["git", "ls-remote"]:
+                return subprocess.CompletedProcess(cmd, 0, f"{commit}\trefs/heads/main\n", "")
+            if list(cmd[:2]) == ["git", "clone"]:
+                shutil.copytree(upstream_tree, cmd[-1], dirs_exist_ok=True)
+                return subprocess.CompletedProcess(cmd, 0, "", "")
+            return real_run(cmd, *args, **kwargs)
+
+        env = {"SKILLCTL_HOME": str(sb.home), "USERPROFILE": str(sb.decoy), "HOME": str(sb.decoy)}
+        with mock.patch.dict(os.environ, env):
+            spec = importlib.util.spec_from_file_location(
+                "skillctl_under_test", sb.repo / "tools" / "skillctl.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            out = io.StringIO()
+            with mock.patch.object(module.subprocess, "run", fake_run), \
+                    contextlib.redirect_stdout(out):
+                rc = module.main(["update", "--apply"])
+        return rc, out.getvalue()
+
+    def upstream(self, sb, description):
+        tree = sb.root / "upstream"
+        write_skill(tree / "skills" / "beta", "beta", description)
+        return tree
+
+    def add_upstream_skill(self, sb, create):
+        entry = sb.add_path_skill("beta", create=create)
+        entry["upstream"] = {"type": "github", "repo": "someone/skills",
+                             "subpath": "skills/beta", "ref": "main"}
+        sb.write_registry()
+
+    def test_update_installs_a_tracked_skill_missing_from_this_machine(self):
+        # A fresh profile: the canonical was never restored. update used to
+        # crash archiving the missing directory, before saving any progress.
+        sb = Sandbox(self)
+        self.add_upstream_skill(sb, create=False)
+        rc, out = self.run_update(sb, self.upstream(sb, "Upstream v2."))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("Upstream v2.", (sb.agents("beta") / "SKILL.md").read_text(encoding="utf-8"))
+        cache = json.loads((sb.repo / "registry" / ".upstream-cache.json").read_text(encoding="utf-8"))
+        self.assertEqual(cache["beta"]["commit"][:7], "c0ffee0")
+
+    def test_update_archives_the_old_canonical_before_replacing_it(self):
+        sb = Sandbox(self)
+        self.add_upstream_skill(sb, create=True)
+        rc, out = self.run_update(sb, self.upstream(sb, "Upstream v2."))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("Upstream v2.", (sb.agents("beta") / "SKILL.md").read_text(encoding="utf-8"))
+        self.assertEqual(sb.archived(), ["upstream-beta"])
+        old = next((sb.repo / "_archive").glob("2*/upstream-beta/SKILL.md"))
+        self.assertIn("Test skill.", old.read_text(encoding="utf-8"))
+
+    def test_unchanged_commit_still_restores_a_missing_canonical(self):
+        sb = Sandbox(self)
+        self.add_upstream_skill(sb, create=False)
+        (sb.repo / "registry" / ".upstream-cache.json").write_text(json.dumps(
+            {"beta": {"commit": "c0ffee0000000000000000000000000000000001"}}), encoding="utf-8")
+        rc, out = self.run_update(sb, self.upstream(sb, "Upstream v2."))
+        self.assertEqual(rc, 0, out)
+        self.assertTrue((sb.agents("beta") / "SKILL.md").is_file(), out)
 
 
 @unittest.skipUnless(os.name == "nt", "skillctl links with mklink /J (Windows only)")
