@@ -23,19 +23,14 @@ For this repo, keep the source skill at:
 <repo>/<skill-name>/SKILL.md
 ```
 
-Provider-facing links should point back to that canonical folder:
+Provider-facing links point back to that canonical folder. In this repo they are user-level junctions that `tools/skillctl.py sync` creates from `registry/skills.json`:
 
 ```text
-<repo>/.codex/skills/<skill-name>
-<repo>/.claude/skills/<skill-name>
-<repo>/.kimi-code/skills/<skill-name>
+~/.agents/skills/<skill-name>   (Codex, Kimi Code, VS Code Copilot)
+~/.claude/skills/<skill-name>   (Claude Code)
 ```
 
-For Codex user-wide availability, use a link under:
-
-```text
-~/.codex/skills/<skill-name>
-```
+Current Codex does not scan `~/.codex/skills`, and the repo keeps no repo-local `.codex/`, `.claude/` or `.kimi-code/` skill folders.
 
 Do not copy the same skill into multiple provider folders unless symlinks or junctions are impossible.
 
@@ -70,7 +65,7 @@ Rules:
 3. Choose the canonical directory.
 4. Normalize frontmatter to the contract.
 5. Preserve the body behavior unless the user asked for a rewrite.
-6. Create or repair provider discovery links.
+6. Register the skill in `registry/skills.json` and create or repair its links with `python tools/skillctl.py sync`.
 7. Add or update `evals/evals.json` if trigger behavior matters.
 8. Report exactly what changed and any provider caveats.
 
@@ -88,7 +83,7 @@ Rules:
   "action": "tri-client-port",
   "skill": "skill-name",
   "canonical": "skill-name/SKILL.md",
-  "links": [".codex/skills/skill-name", ".claude/skills/skill-name", ".kimi-code/skills/skill-name"],
+  "links": ["~/.agents/skills/skill-name", "~/.claude/skills/skill-name"],
   "docs_evidence": [".ai/official-docs-cache/notes/codex-skill-discovery.md"],
   "status": "ported"
 }

@@ -45,7 +45,7 @@ audit warning until they are classified.
 | `official-docs-citation-cache` | Saves compact, dated official-docs evidence notes for Codex, Claude Code, Kimi Code, plugin, skill, MCP, marketplace, config, hook, connector, install, or discovery claims. | Codex, Claude Code, Kimi Code |
 | `tri-client-skill-port` | Ports one canonical skill directory into a tri-client-compatible shape with shared frontmatter, provider discovery links, and docs-backed discovery claims. | Codex, Claude Code, Kimi Code |
 | `skill-trigger-evalsmith` | Creates realistic should-trigger and should-not-trigger activation evals so skill autoactivation can be tuned instead of guessed. | Codex, Claude Code, Kimi Code |
-| `agent-install-sync` | Keeps canonical skill directories, repo-local provider links, user-level Codex links, and duplicate legacy installs aligned without copying skill content. | Codex, Claude Code, Kimi Code |
+| `agent-install-sync` | Keeps canonical skill directories, the registry-driven `~/.agents/skills` and `~/.claude/skills` links, and duplicate legacy installs aligned without copying skill content. | Codex, Claude Code, Kimi Code |
 | `skill-center-curator` | Orchestrates docs evidence, tri-client porting, trigger evals, install sync, README updates, tests, and publish readiness for this skill collection. | Codex, Claude Code, Kimi Code |
 | `skill-doctor` | Diagnoses and repairs the cross-provider skill setup (broken/duplicate/missing skills, junction repair, upstream refreshes) by driving `tools/skillctl.py` against `registry/skills.json`. | Codex, Claude Code, Kimi Code |
 
