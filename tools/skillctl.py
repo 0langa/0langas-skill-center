@@ -492,6 +492,13 @@ def cmd_audit(_args):
                     problems["junction"].append(
                         f"[{provider}] '{skill['name']}': junction {loc} points at "
                         f"{canon}, which does not exist (stale registry canonical?)")
+            elif inst.startswith("path:"):
+                loc = expected_locations(skill, provider)[0]
+                present = (os.path.isdir(loc) if skill.get("bundle")
+                           else os.path.isfile(os.path.join(loc, "SKILL.md")))
+                if not present:
+                    problems["missing"].append(
+                        f"[{provider}] '{skill['name']}' required at {loc} ({inst}) but not there")
             elif inst == "inherit":
                 visible = any(
                     match_skill(registry, e, provider) is skill
@@ -694,6 +701,12 @@ def build_plan(registry, archive_strays=False):
                     add_unfixable(skill, canon, provider)
                 else:
                     plan_link(skill, loc, canon, provider, "junction")
+            elif inst.startswith("path:"):
+                # the skill lives right at this location; nothing to link
+                loc = expected_locations(skill, provider)[0]
+                if not (os.path.isdir(loc) if skill.get("bundle")
+                        else os.path.isfile(os.path.join(loc, "SKILL.md"))):
+                    add_unfixable(skill, loc, provider)
     # A link that a repair rebuilds must not also be archived: relink removes
     # it itself, and archiving it first would make the repair fail and the
     # skill vanish. A real directory or file in the way is the opposite case:

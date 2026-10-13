@@ -339,6 +339,28 @@ class InstallAndRepairTest(unittest.TestCase):
                          [("unfixable", "codex,kimi,claude,vscode")],
                          "one unfixable line per skill, naming every provider")
 
+    def test_audit_sync_and_verify_agree_on_a_missing_path_install(self):
+        # "path:" = the skill lives right at a provider location, e.g. a
+        # Claude-only skill registered from ~/.claude/skills
+        sb = Sandbox(self)
+        sb.skills.append({"name": "claude-only", "origin": "vendored",
+                          "canonical": {"type": "path", "path": "~/.claude/skills/claude-only"},
+                          "upstream": None,
+                          "install": {"codex": "none", "kimi": "none", "vscode": "inherit",
+                                      "claude": "path:~/.claude/skills/claude-only"}})
+        sb.write_registry()
+
+        self.assertEqual(sb.run("verify").returncode, 1)
+        audit = sb.run("audit")
+        self.assertEqual(audit.returncode, 1)
+        self.assertIn("'claude-only' required at", audit.stdout)
+        self.assertEqual([(op, prov) for op, prov, *_ in sb.plan()], [("unfixable", "claude")])
+
+        write_skill(sb.claude("claude-only"), "claude-only")
+        self.assertEqual(sb.run("verify").returncode, 0)
+        self.assertEqual(sb.run("audit").returncode, 0)
+        self.assertNoPlan(sb)
+
     def test_home_reached_through_a_junction_is_idempotent(self):
         # Folder redirection, a moved profile, or an 8.3 spelling such as
         # C:\Users\RUNNER~1 on CI runners: the home path is not its own
