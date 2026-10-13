@@ -26,6 +26,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -90,15 +91,45 @@ def norm(p):
 
 
 def is_link(path):
-    """True for junctions and symlinks (os.path.islink misses junctions)."""
+    """True if `path` itself is a junction or symlink, dangling or not.
+
+    Reads the entry's own reparse tag (os.path.islink misses junctions).
+    Comparing realpath() with abspath() instead also fires for real
+    directories under a linked or 8.3-spelled parent (C:\\Users\\RUNNER~1 on
+    CI runners), which made every entry under such a home look like a link.
+    """
     try:
-        return norm(os.path.realpath(path)) != norm(os.path.abspath(path))
-    except OSError:
+        st = os.lstat(path)
+    except (OSError, ValueError):
         return False
+    if stat.S_ISLNK(st.st_mode):
+        return True
+    return getattr(st, "st_reparse_tag", 0) == stat.IO_REPARSE_TAG_MOUNT_POINT
+
+
+def resolved(path):
+    """Normalized realpath: the spelling to compare link targets in."""
+    return norm(os.path.realpath(path))
 
 
 def link_target(path):
-    return norm(os.path.realpath(path))
+    return resolved(path)
+
+
+_resolved_canonicals = {}
+
+
+def canonical_target(skill):
+    """resolved() of a skill's canonical directory, cached for this run.
+
+    A link target is fully resolved, so it must be compared with the resolved
+    canonical: when ~ or the repo is reached through a link or an 8.3 name,
+    the plain canonical path never matches and every sync relinks again.
+    """
+    canon = canonical_path(skill)
+    if canon not in _resolved_canonicals:
+        _resolved_canonicals[canon] = resolved(canon)
+    return _resolved_canonicals[canon]
 
 
 def parse_frontmatter(skill_md):
@@ -278,7 +309,7 @@ def match_skill(registry, entry, provider):
         for loc in expected_locations(skill, provider):
             if norm(loc) == ep:
                 return skill
-        if er == norm(canonical_path(skill)):
+        if er == canonical_target(skill):
             return skill
     return None
 
@@ -424,7 +455,7 @@ def cmd_audit(_args):
                     problems["junction"].append(
                         f"[{provider}] '{skill['name']}': {loc} is a real directory, "
                         f"expected junction -> {canon}")
-                elif link_target(loc) != norm(canon):
+                elif link_target(loc) != canonical_target(skill):
                     problems["junction"].append(
                         f"[{provider}] '{skill['name']}': junction {loc} targets "
                         f"{os.path.realpath(loc)}, expected {canon}")
@@ -588,7 +619,7 @@ def build_plan(registry, archive_strays=False):
                                 f"real directory occupies junction path for '{skill['name']}'")
                     add_link_action("junction", loc, canon, provider,
                                     f"recreate junction for '{skill['name']}'")
-                elif link_target(loc) != norm(canon):
+                elif link_target(loc) != canonical_target(skill):
                     add_link_action("relink", loc, canon, provider,
                                     f"wrong-target junction for '{skill['name']}' "
                                     f"(now -> {os.path.realpath(loc)})")
@@ -767,7 +798,7 @@ def cmd_verify(args):
                     if not is_link(loc):
                         failures.append(f"[{provider}] '{skill['name']}': no junction at {loc}")
                         continue
-                    if link_target(loc) != norm(canon):
+                    if link_target(loc) != canonical_target(skill):
                         failures.append(f"[{provider}] '{skill['name']}': junction {loc} "
                                         f"targets {os.path.realpath(loc)} != {canon}")
                         continue
@@ -955,11 +986,17 @@ def registry_lock(timeout=15):
 
 
 def home_rel(path):
-    """Collapse the user's home prefix to ~ for portable registry entries."""
+    """Collapse the user's home prefix to ~ for portable registry entries.
+
+    Matches the home in its plain and its resolved spelling: callers pass
+    resolved link targets, which differ from home_dir() when the home is
+    reached through a link or an 8.3 name.
+    """
     p = os.path.normpath(os.path.abspath(path))
-    home = home_dir()
-    if norm(p).startswith(norm(home) + os.sep):
-        p = "~" + p[len(home):]
+    for home in (home_dir(), os.path.realpath(home_dir())):
+        if norm(p).startswith(norm(home) + os.sep):
+            p = "~" + p[len(home):]
+            break
     return p.replace(os.sep, "/")
 
 
@@ -991,12 +1028,15 @@ def find_unregistered(registry):
 
 
 def infer_install(real_path):
-    """Default per-provider install values from where the skill lives."""
+    """Default per-provider install values from where the skill lives.
+
+    real_path is resolved, so it is compared with resolved scan dirs.
+    """
     rp = norm(real_path)
-    agents = norm(AGENTS_DIR)
-    agents_sub = norm(os.path.join(AGENTS_DIR, "skills"))
-    kimi = norm(KIMI_DIR)
-    claude = norm(expand_home("~/.claude/skills"))
+    agents = resolved(AGENTS_DIR)
+    agents_sub = resolved(os.path.join(AGENTS_DIR, "skills"))
+    kimi = resolved(KIMI_DIR)
+    claude = resolved(expand_home("~/.claude/skills"))
     install = {"codex": "none", "kimi": "none", "claude": "none", "vscode": "none"}
     if rp.startswith(agents_sub + os.sep):
         install.update({"codex": "agents/skills", "kimi": "agents/skills",
@@ -1069,7 +1109,7 @@ def _cmd_register_impl(args):
         real = link_target(p)
         name = fm["name"] or os.path.basename(p)
         existing = [s for s in registry["skills"]
-                    if s["name"] == name or norm(canonical_path(s)) == norm(real)]
+                    if s["name"] == name or canonical_target(s) == norm(real)]
         if existing:
             print(f"  skip  '{name}': already registered "
                   f"(canonical: {canonical_path(existing[0])})")
@@ -1117,7 +1157,7 @@ def make_snapshot(label=None):
             inst = skill["install"].get(provider, "none")
             for loc in expected_locations(skill, provider):
                 if inst.startswith("junction:"):
-                    resolves = bool(is_link(loc) and link_target(loc) == norm(canon))
+                    resolves = bool(is_link(loc) and link_target(loc) == canonical_target(skill))
                 elif inst.startswith("path:"):
                     resolves = os.path.isdir(loc)
                 else:

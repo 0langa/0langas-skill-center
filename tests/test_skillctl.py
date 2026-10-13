@@ -259,6 +259,47 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertFalse(os.path.lexists(sb.agents("ghost")))
         self.assertEqual(sb.archived(), ["codex,kimi,vscode-ghost"])
 
+    def test_home_reached_through_a_junction_is_idempotent(self):
+        # Folder redirection, a moved profile, or an 8.3 spelling such as
+        # C:\Users\RUNNER~1 on CI runners: the home path is not its own
+        # realpath. Real directories under it are not links, and a link
+        # target must be compared with the canonical's resolved path.
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.add_path_skill("delta")
+        sb.write_registry()
+        jhome = sb.root / "jhome"
+        make_junction(jhome, sb.home)
+
+        self.assertEqual({op for op, *_ in sb.plan(home=jhome)}, {"junction"})
+        r = sb.run("sync", "--apply", home=jhome)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertLinksTo(sb.claude("delta"), sb.agents("delta"))
+        self.assertNoPlan(sb, home=jhome)
+        verify = sb.run("verify", home=jhome)
+        self.assertEqual(verify.returncode, 0, verify.stdout)
+        audit = sb.run("audit", home=jhome)
+        self.assertEqual(audit.returncode, 0, audit.stdout)
+
+    def test_register_through_a_linked_home_records_portable_paths(self):
+        sb = Sandbox(self)
+        sb.write_registry()
+        jhome = sb.root / "jhome"
+        make_junction(jhome, sb.home)
+        write_skill(sb.agents("newbie"), "newbie")
+        make_junction(sb.claude("newbie"), sb.agents("newbie"))
+
+        r = sb.run("register", str(jhome / ".agents" / "skills" / "newbie"),
+                   "--origin", "vendored", "--apply", home=jhome)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        (entry,) = sb.registry()["skills"]
+        self.assertEqual(entry["canonical"], {"type": "path", "path": "~/.agents/skills/newbie"})
+        self.assertEqual(entry["install"], {"codex": "agents", "kimi": "agents", "vscode": "agents",
+                                            "claude": "junction:~/.claude/skills/newbie"})
+        # registering it again is a no-op
+        sb.run("register", str(sb.agents("newbie")), "--apply", home=jhome)
+        self.assertEqual(len(sb.registry()["skills"]), 1)
+
     def test_unregister_keeps_files_and_refuses_to_archive_repo_content(self):
         sb = Sandbox(self)
         sb.add_repo_skill("alpha")
