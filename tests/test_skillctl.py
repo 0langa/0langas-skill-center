@@ -382,6 +382,56 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertEqual(sb.run("unregister", "beta", "--apply").returncode, 0)
 
 
+@unittest.skipUnless(os.name == "nt", "skillctl links with mklink /J (Windows only)")
+class RepoInstallTest(unittest.TestCase):
+    """This repo's real registry and skills, installed into an empty home."""
+
+    def test_this_repos_skills_install_into_an_empty_home(self):
+        root = Path(tempfile.mkdtemp(prefix="skillctl-repo-install-"))
+        self.addCleanup(remove_tree, root)
+        home, decoy = root / "home", root / "decoy-home"
+        home.mkdir()
+        decoy.mkdir()
+        env = dict(os.environ, SKILLCTL_HOME=str(home), USERPROFILE=str(decoy), HOME=str(decoy))
+
+        def skillctl(*args):
+            return subprocess.run([sys.executable, str(SKILLCTL), *args], capture_output=True,
+                                  text=True, encoding="utf-8", errors="replace", env=env)
+
+        def ops(result):
+            return {m.group(1) for m in map(PLAN_LINE.match, result.stdout.splitlines()) if m}
+
+        # This runs the real skillctl, whose _archive/ is the repo's own: make
+        # sure an empty home needs nothing but new links before applying.
+        self.assertTrue(ops(skillctl("sync", "--plan")) <= {"junction", "unfixable"})
+        applied = skillctl("sync", "--apply")
+        self.assertNotIn("ERROR", applied.stdout)
+
+        registry = json.loads((REPO_ROOT / "registry" / "skills.json").read_text(encoding="utf-8"))
+        linked = 0
+        for skill in registry["skills"]:
+            if skill["canonical"]["type"] != "repo":
+                continue
+            for value in skill["install"].values():
+                if value.startswith("junction:~/"):
+                    link = home / value[len("junction:~/"):]
+                    self.assertTrue(is_link(link), f"no junction at {link}")
+                    self.assertTrue(same_path(link, REPO_ROOT / skill["canonical"]["path"]))
+                    linked += 1
+        self.assertGreater(linked, 0)
+        # Third-party skills cannot be installed from here; they stay unfixable.
+        self.assertEqual(ops(skillctl("sync", "--plan")) - {"unfixable"}, set())
+        self.assertEqual(list(decoy.iterdir()), [], "skillctl wrote outside SKILLCTL_HOME")
+
+        pwsh = shutil.which("pwsh")
+        if pwsh:  # the e2e harness's user-level junction checks agree
+            e2e = subprocess.run([pwsh, "-NoProfile", "-File",
+                                  str(REPO_ROOT / "tests" / "skill-center.e2e.ps1")],
+                                 capture_output=True, text=True, encoding="utf-8",
+                                 errors="replace", env=dict(os.environ, SKILLCTL_HOME=str(home)))
+            self.assertEqual(e2e.returncode, 0, e2e.stdout + e2e.stderr)
+
+
 class VerifyCiTest(unittest.TestCase):
     """verify --ci checks what the repo guarantees, never the machine."""
 
