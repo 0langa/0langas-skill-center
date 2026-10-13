@@ -596,6 +596,18 @@ def build_plan(registry, archive_strays=False):
         linked[key] = a
         actions.append(a)
 
+    unfixable = {}  # (skill, canonical) -> action: one line however many providers
+
+    def add_unfixable(skill, canon, provider):
+        key = (skill["name"], norm(canon))
+        if key in unfixable:
+            unfixable[key]["provider"] += f",{provider}"
+            return
+        a = {"op": "unfixable", "provider": provider,
+             "reason": f"'{skill['name']}' canonical missing at {canon}"}
+        unfixable[key] = a
+        actions.append(a)
+
     for skill in registry["skills"]:
         canon = canonical_path(skill)
         for provider in registry["providers"]:
@@ -607,11 +619,14 @@ def build_plan(registry, archive_strays=False):
                         add_link_action("junction", loc, canon, provider,
                                         f"create missing link for '{skill['name']}' ({inst})")
                     else:
-                        actions.append({"op": "unfixable", "provider": provider,
-                                        "reason": f"'{skill['name']}' canonical missing at {canon}"})
+                        add_unfixable(skill, canon, provider)
             elif inst.startswith("junction:"):
                 loc = expected_locations(skill, provider)[0]
-                if not os.path.isdir(loc) and not is_link(loc):
+                if not os.path.isdir(canon):
+                    # Linking to a canonical that is not there only
+                    # manufactures a dead junction for audit to report.
+                    add_unfixable(skill, canon, provider)
+                elif not os.path.isdir(loc) and not is_link(loc):
                     add_link_action("junction", loc, canon, provider,
                                     f"create missing junction for '{skill['name']}'")
                 elif not is_link(loc):
@@ -634,7 +649,8 @@ def build_plan(registry, archive_strays=False):
     # deterministic order; repairs before archives so a plan is safe to replay
     op_rank = {"junction": 0, "relink": 1, "archive": 2, "review": 3, "unfixable": 4}
     actions.sort(key=lambda a: (op_rank.get(a["op"], 9), a["op"],
-                                a.get("path") or a.get("link") or "", a["provider"]))
+                                a.get("path") or a.get("link") or "", a["reason"],
+                                a["provider"]))
     return actions
 
 

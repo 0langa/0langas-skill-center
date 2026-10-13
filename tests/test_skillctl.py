@@ -259,6 +259,23 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertFalse(os.path.lexists(sb.agents("ghost")))
         self.assertEqual(sb.archived(), ["codex,kimi,vscode-ghost"])
 
+    def test_missing_canonical_is_unfixable_and_creates_no_dead_link(self):
+        # A fresh machine where a third-party skill is registered but not yet
+        # restored: linking to it would only manufacture a broken junction.
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.add_path_skill("beta", create=False)
+        sb.write_registry()
+
+        r = sb.run("sync", "--apply")
+        self.assertEqual(r.returncode, 1, "unfixable entries must fail the apply")
+        self.assertFalse(os.path.lexists(sb.claude("beta")), "created a junction to nothing")
+        self.assertLinksTo(sb.claude("alpha"), sb.repo / "alpha")
+        plan = sb.plan()
+        self.assertEqual([(op, prov) for op, prov, *_ in plan],
+                         [("unfixable", "codex,kimi,claude,vscode")],
+                         "one unfixable line per skill, naming every provider")
+
     def test_home_reached_through_a_junction_is_idempotent(self):
         # Folder redirection, a moved profile, or an 8.3 spelling such as
         # C:\Users\RUNNER~1 on CI runners: the home path is not its own
