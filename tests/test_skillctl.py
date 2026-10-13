@@ -282,6 +282,23 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertEqual(sb.archived(), [])
         self.assertIn("review", [op for op, *_ in sb.plan()])
 
+    def test_folder_of_nested_skills_is_reviewed_not_archived(self):
+        # e.g. a clone of a skills repo, or the old ~/.agents/skills/skills
+        # mirror: no SKILL.md of its own, but working skills inside
+        sb = Sandbox(self)
+        sb.write_registry()
+        write_skill(sb.agents("skills") / "web-scraper-utils", "web-scraper-utils")
+        (sb.agents("old-scripts")).mkdir(parents=True)
+
+        self.assertEqual(sb.run("sync", "--apply").returncode, 0)
+        self.assertTrue((sb.agents("skills") / "web-scraper-utils" / "SKILL.md").is_file())
+        self.assertEqual(sb.archived(), ["codex,kimi,vscode-old-scripts"])
+        (review,) = [p for op, _prov, p, _why in sb.plan() if op == "review"]
+        self.assertEqual(review, str(sb.agents("skills")))
+
+        self.assertEqual(sb.run("sync", "--apply", "--archive-strays").returncode, 0)
+        self.assertFalse(sb.agents("skills").exists())
+
     def test_archive_strays_moves_the_link_never_the_content_behind_it(self):
         sb = Sandbox(self)
         sb.write_registry()

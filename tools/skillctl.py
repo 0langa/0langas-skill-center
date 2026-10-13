@@ -301,6 +301,21 @@ def make_entry(path, name, container_child):
     return e
 
 
+def nested_skills(path, depth=2):
+    """Skill folders (holding a SKILL.md) up to `depth` levels below path."""
+    found = []
+    top = os.path.normpath(path)
+    base = top.count(os.sep)
+    for root, dirs, files in os.walk(top):
+        dirs.sort()
+        if root != top and "SKILL.md" in files:
+            found.append(os.path.relpath(root, top).replace(os.sep, "/"))
+            dirs[:] = []  # a skill's subfolders are its own content
+        elif root.count(os.sep) - base >= depth:
+            dirs[:] = []
+    return found
+
+
 def match_skill(registry, entry, provider):
     """Return the registry skill this scan entry belongs to, or None."""
     ep = norm(entry["path"])
@@ -408,8 +423,10 @@ def cmd_audit(_args):
             if e["fm"] is None:
                 if skill and skill.get("bundle"):
                     continue  # bundle container (e.g. usage-pulse), declared
+                nested = nested_skills(e["path"])
                 problems["stray"].append(
-                    f"[{provider}] directory without SKILL.md, not in registry: {e['path']}")
+                    f"[{provider}] directory without SKILL.md, not in registry: {e['path']}"
+                    + (f" (holds skills: {', '.join(nested)})" if nested else ""))
                 continue
             if e["fm"]["error"]:
                 problems["validation"].append(f"[{provider}] {e['path']}: {e['fm']['error']}")
@@ -574,8 +591,17 @@ def build_plan(registry, archive_strays=False):
             if e["fm"] is None:
                 if skill and skill.get("bundle"):
                     continue
-                add_archive(e["path"], provider,
-                            "stray directory without SKILL.md, not in registry")
+                nested = nested_skills(e["path"])
+                if nested and not archive_strays:
+                    # e.g. a cloned skills repo: archiving the folder would
+                    # silently take working skills with it
+                    add_review(e["path"], provider,
+                               "directory without SKILL.md holds skills ("
+                               + ", ".join(nested[:3]) + (", ..." if len(nested) > 3 else "")
+                               + ") - register them, or `sync --archive-strays` to archive it")
+                else:
+                    add_archive(e["path"], provider,
+                                "stray directory without SKILL.md, not in registry")
                 continue
             if skill is None:
                 reason = f"stray skill '{e['fm']['name']}' not in registry"
