@@ -8,7 +8,7 @@ This repo is intended to grow into a broader skill center, not a single-purpose 
 
 - Top-level skill folders, such as `official-ai-devdocs/`, are the canonical source directories.
 - User-level discovery is via junctions/symlinks: `~/.agents/skills/<name>` (read natively by Codex, Kimi Code, and VS Code Copilot) and `~/.claude/skills/<name>` (Claude Code). Note: current Codex does NOT scan `~/.codex/skills`.
-- Repo-local `.claude/skills/`, `.kimi-code/skills/`, `.codex/skills/` link the skills for working inside this repo itself.
+- There are no repo-local provider folders (`.claude/skills/` and the like): the user-level links already make every skill visible while working inside this repo.
 - `registry/skills.json` + `tools/skillctl.py` manage and verify that link layout — see "Skill management system" below.
 
 ## Provenance
@@ -71,11 +71,11 @@ Stack-specific skills for the projects in this workspace (Tauri/React/WebGPU des
 
 This repo is the management hub for skills installed across Codex CLI, Claude Code, Kimi Code, and VS Code Copilot.
 
-- `registry/skills.json` is the machine-readable source of truth: provider scan layouts (encoded as data), every known skill, its canonical location, its optional GitHub upstream, and its per-provider install method (`agents`, `agents/skills`, `kimi`, `junction:<path>`, `plugin:<id>`, `inherit`, `none`).
+- `registry/skills.json` is the machine-readable source of truth: provider scan layouts (encoded as data), every known skill, its canonical location, its optional GitHub upstream, and its per-provider install method (`agents`, `agents/skills`, `kimi`, `junction:<path>`, `path:<path>`, `plugin:<id>`, `inherit`, `none`).
 - `tools/skillctl.py` (Python 3.11+, stdlib only) reconciles reality to the registry:
   - `python tools/skillctl.py audit` — scan all provider scan dirs and report missing installs, strays, duplicates, broken/wrong-target junctions, and frontmatter validation errors (exit 1 on any problem).
-  - `python tools/skillctl.py sync [--plan|--apply] [--only <path-or-name>...]` — plan (default) or apply reconciliation: create/repair junctions, and move anything that must be removed into `_archive/` (never delete). Idempotent. A valid skill that is merely missing from the registry is reported as `review` and left alone; `--archive-strays` opts in to removing those. `--only` limits the plan to selected paths/skills for per-item repairs.
-  - `python tools/skillctl.py verify [--ci]` — every registry skill resolves at every mapped location with valid frontmatter (exit non-zero on failure). `--ci` runs repo-local checks only (no home-dir access) and is what CI runs.
+  - `python tools/skillctl.py sync [--plan|--apply] [--only <path-or-name>...]` — plan (default) or apply reconciliation: create/repair junctions, and move anything that must be removed into `_archive/` (never delete). Idempotent. A valid skill that is merely missing from the registry, or a folder holding such skills, is reported as `review` and left alone; `--archive-strays` opts in to removing those. A real directory or file sitting where a junction belongs is archived first, then linked. A registered skill whose canonical is not on this machine is reported as `unfixable` and never linked. `--only` limits the plan to selected paths/skills for per-item repairs.
+  - `python tools/skillctl.py verify [--ci]` — every registry skill resolves at every mapped location with valid frontmatter (exit non-zero on failure). `--ci` checks only what the repo itself guarantees, with no home-dir access, and is what CI runs: registry shape and install methods, that every mapped location is somewhere its provider scans, one owner per location, provenance, and that every repo skill is present, named in its frontmatter, and registered.
   - `python tools/skillctl.py update [--skill <name>] [--apply]` — refresh skills with a GitHub upstream: skip when the cached commit is unchanged (`registry/.upstream-cache.json`), otherwise snapshot the state, archive the old canonical, and replace it with the upstream subpath.
   - `python tools/skillctl.py register [--scan] [<path>...] [--upstream OWNER/REPO[:SUBPATH]] [--origin mine|vendored|unknown] [--apply]` — adopt newly installed skills into the registry: `--scan` lists unregistered skills across provider dirs; path-based registration infers the per-provider install map automatically and always records a path canonical, never a repo one. `--origin` records authorship (see "Provenance").
   - `python tools/skillctl.py discover [--fetch <name>...] [--apply]` — list skills that exist in known upstream GitHub repos but are not registered; `--fetch` downloads one into `~/.agents/skills/` and registers it with its upstream recorded.
@@ -83,10 +83,12 @@ This repo is the management hub for skills installed across Codex CLI, Claude Co
   - `python tools/skillctl.py snapshot [--label <text>]` — write registry + link map + skill listing to `_archive/snapshots/<timestamp>/` (also runs automatically before `update --apply`).
   - `python tools/skillctl.py plugins` — read-only report of installed claude/kimi plugins, the skills they provide, and overlaps with registry skills.
   - `python tools/skillctl.py archive <path> [--reason <text>]` — manually move a skill directory into `_archive/` with a log entry.
-  - Mutating subcommands plan by default; `--apply` executes, `--dry-run` is an explicit no-change alias and conflicts with `--apply`.
+  - Mutating subcommands plan by default; `--apply` executes, `--dry-run` is an explicit no-change alias and conflicts with `--apply`. `archive` is the exception: it moves the path immediately.
+  - `SKILLCTL_HOME=<dir>` makes `~` mean `<dir>` for every subcommand (and for the e2e harness and trap scripts), so a whole install can be exercised in a throwaway home. The tests use it; nothing then touches the real `~/.agents`, `~/.claude` or `~/.kimi-code`.
+  - Repo-skill junctions point at the checkout skillctl runs from. Run `sync --apply` from your main checkout: links made from a worktree go dead when the worktree is removed.
 - `_archive/` convention: outdated, misconfigured, duplicated, or stray skills are **archived, never deleted** — moved to `_archive/<YYYYMMDD>/` and logged in `_archive/LOG.md`.
 - The one command to get everything back in order: the `skill-doctor` skill (`/skill-doctor` in Claude Code, `skill:skill-doctor` in Kimi Code, or just ask Codex to "get my skills back in order"). Tell it what you want in the same prompt (check, register new, discover, update, clean up): it plans the sequence, asks before every disk change (subset answers honored), then reports per provider.
-- CI: `.github/workflows/skill-verify.yml` runs `verify --ci` and the e2e harness (`-CI` mode) on every push and PR.
+- CI: `.github/workflows/skill-verify.yml` runs `verify --ci`, the sandboxed skillctl tests, and the e2e harness (`-CI` mode) on every push and PR to `main`.
 
 ### Provider matrix (verified 2026-08-04)
 
@@ -99,13 +101,17 @@ This repo is the management hub for skills installed across Codex CLI, Claude Co
 
 ## Validation
 
-Run the repo E2E checks after adding, renaming, moving, or publishing skills:
+Run the checks after adding, renaming, moving, or publishing skills, and after changing `tools/skillctl.py`:
 
 ```powershell
+python tools/skillctl.py verify --ci
+python -m unittest discover -s tests -v
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\skill-center.e2e.ps1
 ```
 
-The test verifies required skill frontmatter, JSON eval files, trigger-eval coverage, repo-local provider link resolution, registry-driven user-level junctions in `~/.agents/skills` and `~/.claude/skills` (the authoritative layout; `~/.codex/skills` and `~/.kimi-code/skills` are intentionally not used for repo skills), README catalog coverage, official docs cache records, and the intended dependency order between these five workflow skills.
+`tests/test_skillctl.py` drives skillctl against throwaway homes (via `SKILLCTL_HOME`): fresh install and idempotency, relinking dead and wrong-target junctions, archiving whatever occupies a junction path, review-only handling of unregistered skills, `register`/`unregister`, `verify --ci`, and this repo's real registry installed into an empty home.
+
+The E2E harness verifies, for every repo skill in the registry, frontmatter name and description, JSON eval files, trigger-eval shape, and README catalog coverage; the five workflow skills are also held to the full tri-client frontmatter contract and the stricter eval thresholds, and to their intended dependency order. It validates the official docs cache records when `.ai/official-docs-cache/` exists. Without `-CI` it also asserts the registry-driven user-level junctions in `~/.agents/skills` and `~/.claude/skills` (the authoritative layout; `~/.codex/skills` and `~/.kimi-code/skills` are intentionally not used for repo skills), so run it after `sync --apply`.
 
 ## Candidate Skills
 
@@ -119,10 +125,12 @@ These are workflow-specific, autoactivating skills that would fit this collectio
 
 ## Install Notes
 
-Clone the repository into any project or shared skills location that your agent client can scan.
+Clone the repository, then let the registry link its skills into the user-level discovery folders:
 
-For project-local discovery:
+```powershell
+python tools/skillctl.py sync           # plan: what would be linked, repaired, or archived
+python tools/skillctl.py sync --apply   # create the junctions
+python tools/skillctl.py verify
+```
 
-- Claude Code: keep `.claude/skills/<skill-name>`.
-- Kimi Code: keep `.kimi-code/skills/<skill-name>`.
-- Codex: keep `.codex/skills/<skill-name>` for clean provider-specific organization. For user-wide discovery in Codex, install or symlink the canonical skill into your Codex skills home, for example `~/.codex/skills/<skill-name>`.
+Each repo skill gets a directory junction in `~/.agents/skills/` (Codex, Kimi Code, VS Code Copilot) and `~/.claude/skills/` (Claude Code), so edits in the repo are live everywhere and nothing is copied. Current Codex does not scan `~/.codex/skills`. Registry entries for skills that live outside this repo report `unfixable` (and fail `verify`) until those skills are installed on the machine; `unregister` the ones you do not use.
