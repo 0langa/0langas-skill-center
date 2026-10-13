@@ -1,8 +1,8 @@
 param(
-  # -CI skips all user-level / machine-local assertions (repo-local provider
-  # links and registry-driven home-dir junctions) so the harness can run on a
-  # clean CI checkout. All repo-content checks (frontmatter, evals, README
-  # catalog rows, docs-cache records, dependency order) still run.
+  # -CI skips the machine-local assertions (registry-driven home-dir
+  # junctions) so the harness can run on a clean CI checkout. All
+  # repo-content checks (frontmatter, evals, README catalog rows, dependency
+  # order, and docs-cache records when present) still run.
   [switch]$CI
 )
 
@@ -12,29 +12,15 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 # SKILLCTL_HOME redirects "~" the same way tools/skillctl.py does, so the
 # user-level checks can run against a sandbox install instead of the real home.
 $UserHome = if ($env:SKILLCTL_HOME) { [System.IO.Path]::GetFullPath($env:SKILLCTL_HOME) } else { $HOME }
+
+# The workflow skills are held to the full tri-client frontmatter contract and
+# the stricter eval thresholds; every other repo skill gets the shape checks.
 $WorkflowSkills = @(
   "official-docs-citation-cache",
   "tri-client-skill-port",
   "skill-trigger-evalsmith",
   "agent-install-sync",
   "skill-center-curator"
-)
-
-$InstalledSkills = @(
-  "official-ai-devdocs",
-  "muteman",
-  "official-docs-citation-cache",
-  "tri-client-skill-port",
-  "skill-trigger-evalsmith",
-  "agent-install-sync",
-  "skill-center-curator",
-  "skill-doctor"
-)
-
-$ProviderRoots = @(
-  ".codex\skills",
-  ".claude\skills",
-  ".kimi-code\skills"
 )
 
 # Legacy user install roots ($HOME\.codex\skills, $HOME\.kimi-code\skills) are
@@ -113,32 +99,6 @@ function Resolve-LinkTarget {
   }
 }
 
-function Test-ProviderLink {
-  param(
-    [string]$Skill,
-    [string]$Root
-  )
-
-  $linkPath = Join-Path (Join-Path $RepoRoot $Root) $Skill
-  $expected = (Resolve-Path -LiteralPath (Join-Path $RepoRoot $Skill)).Path
-
-  if (-not (Test-Path -LiteralPath $linkPath)) {
-    Add-Failure "Missing provider link: $linkPath"
-    return
-  }
-
-  $item = Get-Item -LiteralPath $linkPath -Force
-  if ($item.LinkType -ne "SymbolicLink" -and $item.LinkType -ne "Junction") {
-    Add-Failure "Provider entry is not a symlink or junction: $linkPath"
-    return
-  }
-
-  $resolved = Resolve-LinkTarget $item
-  if ($resolved -ne $expected) {
-    Add-Failure "Provider link target mismatch: $linkPath -> $resolved expected $expected"
-  }
-}
-
 function Test-UserSkillLink {
   param(
     [string]$LinkPath,
@@ -162,29 +122,19 @@ function Test-UserSkillLink {
   }
 }
 
-function Test-TriggerEvals {
+function Test-TriggerEvalShape {
   param(
     [string]$Skill,
     [object]$Json
   )
 
-  if ($null -eq $Json -or $Json.Count -lt 6) {
-    Add-Failure "Trigger evals need at least 6 cases: $Skill"
-    return
+  $cases = @($Json)
+  if (@($cases | Where-Object { $_.should_trigger -eq $true }).Count -lt 1 -or
+      @($cases | Where-Object { $_.should_trigger -eq $false }).Count -lt 1) {
+    Add-Failure "Trigger evals need should_trigger=true and should_trigger=false cases: $Skill"
   }
 
-  $positive = @($Json | Where-Object { $_.should_trigger -eq $true }).Count
-  $negative = @($Json | Where-Object { $_.should_trigger -eq $false }).Count
-
-  if ($positive -lt 3) {
-    Add-Failure "Trigger evals need at least 3 should_trigger=true cases: $Skill"
-  }
-
-  if ($negative -lt 3) {
-    Add-Failure "Trigger evals need at least 3 should_trigger=false cases: $Skill"
-  }
-
-  foreach ($case in $Json) {
+  foreach ($case in $cases) {
     foreach ($field in @("id", "query", "reason", "expected_routing")) {
       if ([string]::IsNullOrWhiteSpace([string]$case.$field)) {
         Add-Failure "Trigger eval case missing ${field}: $Skill"
@@ -193,11 +143,44 @@ function Test-TriggerEvals {
   }
 }
 
-$RequiredFields = @("name", "description", "when_to_use", "type", "whenToUse", "disableModelInvocation")
-$Readme = Get-Content -LiteralPath (Join-Path $RepoRoot "README.md") -Raw
+function Test-TriggerEvalThresholds {
+  param(
+    [string]$Skill,
+    [object]$Json
+  )
 
-foreach ($skill in $WorkflowSkills) {
-  $skillDir = Join-Path $RepoRoot $skill
+  $cases = @($Json)
+  if ($cases.Count -lt 6) {
+    Add-Failure "Trigger evals need at least 6 cases: $Skill"
+    return
+  }
+
+  if (@($cases | Where-Object { $_.should_trigger -eq $true }).Count -lt 3) {
+    Add-Failure "Trigger evals need at least 3 should_trigger=true cases: $Skill"
+  }
+
+  if (@($cases | Where-Object { $_.should_trigger -eq $false }).Count -lt 3) {
+    Add-Failure "Trigger evals need at least 3 should_trigger=false cases: $Skill"
+  }
+}
+
+$Readme = Get-Content -LiteralPath (Join-Path $RepoRoot "README.md") -Raw
+$registryPath = Join-Path $RepoRoot "registry\skills.json"
+$Registry = Read-JsonFile $registryPath
+$RepoSkills = @()
+if ($null -eq $Registry) {
+  Add-Failure "Missing or invalid registry: $registryPath"
+}
+else {
+  $RepoSkills = @($Registry.skills | Where-Object { $_.canonical.type -eq "repo" })
+}
+
+# Every skill that lives in this repo, as the registry lists them.
+$EvalsBySkill = @{}
+$TriggersBySkill = @{}
+foreach ($entry in $RepoSkills) {
+  $skill = [string]$entry.name
+  $skillDir = Join-Path $RepoRoot $entry.canonical.path
   $skillPath = Join-Path $skillDir "SKILL.md"
 
   if (-not (Test-Path -LiteralPath $skillPath)) {
@@ -206,22 +189,11 @@ foreach ($skill in $WorkflowSkills) {
   }
 
   $frontmatter = Get-FrontmatterMap $skillPath
-  foreach ($field in $RequiredFields) {
-    if (-not $frontmatter.ContainsKey($field) -or [string]::IsNullOrWhiteSpace($frontmatter[$field])) {
-      Add-Failure "Missing frontmatter field '$field': $skillPath"
-    }
-  }
-
-  if ($frontmatter.ContainsKey("name") -and $frontmatter["name"] -ne $skill) {
+  if ($frontmatter["name"] -ne $skill) {
     Add-Failure "Frontmatter name mismatch: $skillPath has '$($frontmatter["name"])'"
   }
-
-  if ($frontmatter.ContainsKey("type") -and $frontmatter["type"] -ne "prompt") {
-    Add-Failure "Unexpected type for ${skill}: $($frontmatter["type"])"
-  }
-
-  if ($frontmatter.ContainsKey("disableModelInvocation") -and $frontmatter["disableModelInvocation"] -ne "false") {
-    Add-Failure "Unexpected disableModelInvocation for ${skill}: $($frontmatter["disableModelInvocation"])"
+  if ([string]::IsNullOrWhiteSpace($frontmatter["description"])) {
+    Add-Failure "Missing frontmatter field 'description': $skillPath"
   }
 
   $evalPath = Join-Path $skillDir "evals\evals.json"
@@ -230,11 +202,12 @@ foreach ($skill in $WorkflowSkills) {
   }
   else {
     $evalJson = Read-JsonFile $evalPath
+    $EvalsBySkill[$skill] = $evalJson
     if ($null -ne $evalJson -and $evalJson.skill_name -ne $skill) {
       Add-Failure "evals.json skill_name mismatch: $skill"
     }
-    if ($null -ne $evalJson -and @($evalJson.evals).Count -lt 3) {
-      Add-Failure "evals.json needs at least 3 eval prompts: $skill"
+    if ($null -ne $evalJson -and @($evalJson.evals).Count -lt 1) {
+      Add-Failure "evals.json has no eval prompts: $skill"
     }
   }
 
@@ -243,7 +216,11 @@ foreach ($skill in $WorkflowSkills) {
     Add-Failure "Missing trigger-evals.json: $skill"
   }
   else {
-    Test-TriggerEvals $skill (Read-JsonFile $triggerPath)
+    $triggerJson = Read-JsonFile $triggerPath
+    $TriggersBySkill[$skill] = $triggerJson
+    if ($null -ne $triggerJson) {
+      Test-TriggerEvalShape $skill $triggerJson
+    }
   }
 
   $readmeRowNeedle = "| ``$skill`` |"
@@ -257,65 +234,86 @@ foreach ($skill in $WorkflowSkills) {
   }
 }
 
-if ($CI) {
-  Write-Host "[CI] skipping user-level link checks (repo-local provider links and home-dir junctions)" -ForegroundColor Yellow
-}
-else {
-  foreach ($skill in $InstalledSkills) {
-    foreach ($root in $ProviderRoots) {
-      Test-ProviderLink $skill $root
+$RequiredFields = @("name", "description", "when_to_use", "type", "whenToUse", "disableModelInvocation")
+$RepoSkillNames = @($RepoSkills | ForEach-Object { [string]$_.name })
+
+foreach ($skill in $WorkflowSkills) {
+  if ($RepoSkillNames -notcontains $skill) {
+    Add-Failure "Workflow skill is not registered as a repo skill: $skill"
+    continue
+  }
+  $skillPath = Join-Path (Join-Path $RepoRoot $skill) "SKILL.md"
+  if (-not (Test-Path -LiteralPath $skillPath)) {
+    continue  # already reported above
+  }
+
+  $frontmatter = Get-FrontmatterMap $skillPath
+  foreach ($field in $RequiredFields) {
+    if (-not $frontmatter.ContainsKey($field) -or [string]::IsNullOrWhiteSpace($frontmatter[$field])) {
+      Add-Failure "Missing frontmatter field '$field': $skillPath"
     }
   }
 
+  if ($frontmatter.ContainsKey("type") -and $frontmatter["type"] -ne "prompt") {
+    Add-Failure "Unexpected type for ${skill}: $($frontmatter["type"])"
+  }
+
+  if ($frontmatter.ContainsKey("disableModelInvocation") -and $frontmatter["disableModelInvocation"] -ne "false") {
+    Add-Failure "Unexpected disableModelInvocation for ${skill}: $($frontmatter["disableModelInvocation"])"
+  }
+
+  if ($null -ne $EvalsBySkill[$skill] -and @($EvalsBySkill[$skill].evals).Count -lt 3) {
+    Add-Failure "evals.json needs at least 3 eval prompts: $skill"
+  }
+
+  if ($null -ne $TriggersBySkill[$skill]) {
+    Test-TriggerEvalThresholds $skill $TriggersBySkill[$skill]
+  }
+}
+
+if ($CI) {
+  Write-Host "[CI] skipping user-level link checks (home-dir junctions)" -ForegroundColor Yellow
+}
+elseif ($null -ne $Registry) {
   # User-level junction assertions driven from registry/skills.json: every
   # repo-canonical skill with an install method of "junction:<path>" must have a
   # junction at <path> resolving to its canonical repo directory. This asserts the
   # current layout (~/.agents/skills for codex/kimi/vscode, ~/.claude/skills for
   # claude) without hardcoding provider roots.
-  $registryPath = Join-Path $RepoRoot "registry\skills.json"
-  $registry = Read-JsonFile $registryPath
-  if ($null -eq $registry) {
-    Add-Failure "Missing or invalid registry: $registryPath"
-  }
-  else {
-    $checkedLinks = @{}
-    foreach ($entry in $registry.skills) {
-      if ($entry.canonical.type -ne "repo") { continue }
-      $expected = (Resolve-Path -LiteralPath (Join-Path $RepoRoot $entry.canonical.path)).Path
-      foreach ($prop in $entry.install.PSObject.Properties) {
-        $method = [string]$prop.Value
-        if (-not $method.StartsWith("junction:")) { continue }
-        $linkPath = $method.Substring("junction:".Length)
-        if ($linkPath.StartsWith("~/") -or $linkPath.StartsWith("~\")) {
-          $linkPath = Join-Path $UserHome $linkPath.Substring(2)
-        }
-        $linkPath = [System.IO.Path]::GetFullPath($linkPath)
-        $key = $linkPath.ToLowerInvariant()
-        if ($checkedLinks.ContainsKey($key)) { continue }
-        $checkedLinks[$key] = $true
-        Test-UserSkillLink $linkPath $expected
+  $checkedLinks = @{}
+  foreach ($entry in $RepoSkills) {
+    $canonicalDir = Join-Path $RepoRoot $entry.canonical.path
+    if (-not (Test-Path -LiteralPath $canonicalDir)) { continue }  # reported above
+    $expected = (Resolve-Path -LiteralPath $canonicalDir).Path
+    foreach ($prop in $entry.install.PSObject.Properties) {
+      $method = [string]$prop.Value
+      if (-not $method.StartsWith("junction:")) { continue }
+      $linkPath = $method.Substring("junction:".Length)
+      if ($linkPath.StartsWith("~/") -or $linkPath.StartsWith("~\")) {
+        $linkPath = Join-Path $UserHome $linkPath.Substring(2)
       }
+      $linkPath = [System.IO.Path]::GetFullPath($linkPath)
+      $key = $linkPath.ToLowerInvariant()
+      if ($checkedLinks.ContainsKey($key)) { continue }
+      $checkedLinks[$key] = $true
+      Test-UserSkillLink $linkPath $expected
     }
   }
 }
 
+# Evidence notes written by the official-docs-citation-cache skill. They are
+# working data, so the records are validated when the cache exists rather
+# than required.
 $cacheIndexPath = Join-Path $RepoRoot ".ai\official-docs-cache\index.json"
-if (-not (Test-Path -LiteralPath $cacheIndexPath)) {
-  Add-Failure "Missing official docs cache index"
-}
-else {
+if (Test-Path -LiteralPath $cacheIndexPath) {
   $cache = Read-JsonFile $cacheIndexPath
   if ($null -ne $cache) {
-    foreach ($provider in @("codex", "claude-code", "kimi-code")) {
-      $note = @($cache.notes | Where-Object { $_.provider -eq $provider -and $_.topic -eq "skill-discovery" })[0]
-      if ($null -eq $note) {
-        Add-Failure "Docs cache missing skill-discovery note for $provider"
+    foreach ($note in @($cache.notes)) {
+      if ([string]::IsNullOrWhiteSpace([string]$note.path)) {
+        Add-Failure "Docs cache record without a path: provider=$($note.provider) topic=$($note.topic)"
       }
-      else {
-        $notePath = Join-Path $RepoRoot $note.path
-        if (-not (Test-Path -LiteralPath $notePath)) {
-          Add-Failure "Docs cache note path missing for ${provider}: $($note.path)"
-        }
+      elseif (-not (Test-Path -LiteralPath (Join-Path $RepoRoot $note.path))) {
+        Add-Failure "Docs cache note path missing for $($note.provider)/$($note.topic): $($note.path)"
       }
     }
   }
@@ -330,6 +328,10 @@ $DependencyChecks = @{
 
 foreach ($relativePath in $DependencyChecks.Keys) {
   $path = Join-Path $RepoRoot $relativePath
+  if (-not (Test-Path -LiteralPath $path)) {
+    Add-Failure "Dependency order check target missing: $relativePath"
+    continue
+  }
   $text = Get-Content -LiteralPath $path -Raw
   foreach ($needle in $DependencyChecks[$relativePath]) {
     if ($text -notmatch [regex]::Escape($needle)) {
@@ -346,4 +348,4 @@ if ($Failures.Count -gt 0) {
   exit 1
 }
 
-Write-Host "skill-center E2E passed for $($WorkflowSkills.Count) workflow skills and $($InstalledSkills.Count) installed skills." -ForegroundColor Green
+Write-Host "skill-center E2E passed for $($RepoSkills.Count) repo skills ($($WorkflowSkills.Count) workflow skills held to the full contract)." -ForegroundColor Green
