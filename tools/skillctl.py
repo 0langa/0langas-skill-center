@@ -525,12 +525,21 @@ def build_plan(registry, archive_strays=False):
 
     # strays & duplicates from scan
     archived = {}  # norm(path) -> action, so a path scanned by N providers is archived once
-    def add_archive(path, provider, reason):
+
+    def add_archive(path, provider, reason, clears=False):
+        """clears: a link repair needs this path empty, so the archive runs
+        before the links are made and is never dropped as a conflict."""
         key = norm(path)
         if key in archived:
-            archived[key]["provider"] += f",{provider}"
+            a = archived[key]
+            if provider not in a["provider"].split(","):
+                a["provider"] += f",{provider}"
+            if clears and not a.get("clears"):
+                a["clears"], a["reason"] = True, reason
             return
         a = {"op": "archive", "path": path, "provider": provider, "reason": reason}
+        if clears:
+            a["clears"] = True
         archived[key] = a
         actions.append(a)
 
@@ -608,47 +617,60 @@ def build_plan(registry, archive_strays=False):
         unfixable[key] = a
         actions.append(a)
 
+    def plan_link(skill, loc, canon, provider, kind, note=""):
+        """Plan whatever turns `loc` into a link to `canon`."""
+        name = skill["name"]
+        if is_link(loc):
+            if link_target(loc) != canonical_target(skill):
+                add_link_action("relink", loc, canon, provider,
+                                f"wrong-target {kind} for '{name}'{note} "
+                                f"(now -> {os.path.realpath(loc)})")
+        elif os.path.lexists(loc):
+            # mklink cannot replace an existing entry: move it out first
+            what = "directory" if os.path.isdir(loc) else "file"
+            add_archive(loc, provider, f"real {what} occupies {kind} path for '{name}'",
+                        clears=True)
+            add_link_action("junction", loc, canon, provider,
+                            f"recreate {kind} for '{name}'{note}")
+        else:
+            add_link_action("junction", loc, canon, provider,
+                            f"create missing {kind} for '{name}'{note}")
+
     for skill in registry["skills"]:
         canon = canonical_path(skill)
         for provider in registry["providers"]:
             inst = skill["install"].get(provider, "none")
             if inst in BASE_INSTALLS:
                 loc = expected_locations(skill, provider)[0]
-                if not os.path.isfile(os.path.join(loc, "SKILL.md")):
-                    if norm(canon) != norm(loc) and os.path.isdir(canon):
-                        add_link_action("junction", loc, canon, provider,
-                                        f"create missing link for '{skill['name']}' ({inst})")
-                    else:
-                        add_unfixable(skill, canon, provider)
+                if os.path.isfile(os.path.join(loc, "SKILL.md")):
+                    pass  # visible to the provider already
+                elif norm(canon) == norm(loc) or not os.path.isdir(canon):
+                    add_unfixable(skill, canon, provider)
+                else:
+                    plan_link(skill, loc, canon, provider, "link", f" ({inst})")
             elif inst.startswith("junction:"):
                 loc = expected_locations(skill, provider)[0]
                 if not os.path.isdir(canon):
                     # Linking to a canonical that is not there only
                     # manufactures a dead junction for audit to report.
                     add_unfixable(skill, canon, provider)
-                elif not os.path.isdir(loc) and not is_link(loc):
-                    add_link_action("junction", loc, canon, provider,
-                                    f"create missing junction for '{skill['name']}'")
-                elif not is_link(loc):
-                    add_archive(loc, provider,
-                                f"real directory occupies junction path for '{skill['name']}'")
-                    add_link_action("junction", loc, canon, provider,
-                                    f"recreate junction for '{skill['name']}'")
-                elif link_target(loc) != canonical_target(skill):
-                    add_link_action("relink", loc, canon, provider,
-                                    f"wrong-target junction for '{skill['name']}' "
-                                    f"(now -> {os.path.realpath(loc)})")
-    # An archive must never target a path that a link repair is about to
-    # rebuild: archiving first makes the repair fail and the skill vanish.
+                else:
+                    plan_link(skill, loc, canon, provider, "junction")
+    # A link that a repair rebuilds must not also be archived: relink removes
+    # it itself, and archiving it first would make the repair fail and the
+    # skill vanish. A real directory or file in the way is the opposite case:
+    # it is marked "clears" and has to be archived first.
     repaired = {norm(a["link"]) for a in actions if a["op"] in ("junction", "relink")}
     conflicts = [a for a in actions
-                 if a["op"] == "archive" and norm(a["path"]) in repaired]
+                 if a["op"] == "archive" and not a.get("clears")
+                 and norm(a["path"]) in repaired]
     for a in conflicts:
         actions.remove(a)
 
-    # deterministic order; repairs before archives so a plan is safe to replay
-    op_rank = {"junction": 0, "relink": 1, "archive": 2, "review": 3, "unfixable": 4}
-    actions.sort(key=lambda a: (op_rank.get(a["op"], 9), a["op"],
+    # Deterministic order, safe to replay: clear occupied link paths, make
+    # the links, then evict strays.
+    op_rank = {"junction": 1, "relink": 2, "archive": 3, "review": 4, "unfixable": 5}
+    actions.sort(key=lambda a: (0 if a.get("clears") else op_rank.get(a["op"], 9), a["op"],
                                 a.get("path") or a.get("link") or "", a["reason"],
                                 a["provider"]))
     return actions

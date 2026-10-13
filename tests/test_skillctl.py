@@ -225,6 +225,52 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertTrue((sb.repo / "gamma" / "SKILL.md").is_file())
         self.assertNoPlan(sb)
 
+    def test_real_directory_on_a_junction_path_is_archived_then_linked(self):
+        # e.g. an old copy installed by hand before the skill moved into the repo
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.write_registry()
+        old = write_skill(sb.agents("alpha"), "alpha", "Old hand-installed copy.")
+        (old / "notes.txt").write_text("keep me", encoding="utf-8")
+
+        ops = [(op, path) for op, _prov, path, _why in sb.plan()]
+        self.assertEqual(ops[0], ("archive", str(sb.agents("alpha"))),
+                         "the occupant must be moved out before the junction is created")
+        self.assertIn(("junction", str(sb.agents("alpha"))), ops)
+        r = sb.run("sync", "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertLinksTo(sb.agents("alpha"), sb.repo / "alpha")
+        (kept,) = [d for day in (sb.repo / "_archive").iterdir() if day.is_dir()
+                   for d in day.iterdir()]
+        self.assertEqual((kept / "notes.txt").read_text(encoding="utf-8"), "keep me")
+        self.assertNoPlan(sb)
+
+    def test_file_on_a_junction_path_is_archived_then_linked(self):
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.write_registry()
+        sb.claude("alpha").parent.mkdir(parents=True)
+        sb.claude("alpha").write_text("not a skill", encoding="utf-8")
+
+        r = sb.run("sync", "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertLinksTo(sb.claude("alpha"), sb.repo / "alpha")
+        self.assertEqual(len(sb.archived()), 1)
+        self.assertNoPlan(sb)
+
+    def test_agents_install_relinks_a_dead_link_to_a_canonical_elsewhere(self):
+        sb = Sandbox(self)
+        entry = sb.add_repo_skill("alpha")
+        entry["install"].update({"codex": "agents", "kimi": "agents"})
+        sb.write_registry()
+        make_junction(sb.agents("alpha"), sb.root / "old-repo-location" / "alpha")
+
+        self.assertEqual([op for op, *_ in sb.plan()], ["junction", "relink"])
+        r = sb.run("sync", "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertLinksTo(sb.agents("alpha"), sb.repo / "alpha")
+        self.assertNoPlan(sb)
+
     def test_unregistered_skill_is_reported_for_review_and_left_alone(self):
         sb = Sandbox(self)
         sb.add_repo_skill("alpha")
