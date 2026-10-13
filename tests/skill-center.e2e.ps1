@@ -9,6 +9,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+# SKILLCTL_HOME redirects "~" the same way tools/skillctl.py does, so the
+# user-level checks can run against a sandbox install instead of the real home.
+$UserHome = if ($env:SKILLCTL_HOME) { [System.IO.Path]::GetFullPath($env:SKILLCTL_HOME) } else { $HOME }
 $WorkflowSkills = @(
   "official-docs-citation-cache",
   "tri-client-skill-port",
@@ -284,7 +287,7 @@ else {
         if (-not $method.StartsWith("junction:")) { continue }
         $linkPath = $method.Substring("junction:".Length)
         if ($linkPath.StartsWith("~/") -or $linkPath.StartsWith("~\")) {
-          $linkPath = Join-Path $HOME $linkPath.Substring(2)
+          $linkPath = Join-Path $UserHome $linkPath.Substring(2)
         }
         $linkPath = [System.IO.Path]::GetFullPath($linkPath)
         $key = $linkPath.ToLowerInvariant()

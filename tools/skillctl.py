@@ -13,6 +13,9 @@ Hard rules enforced here:
 - Never touch ~/.claude/plugins, ~/.kimi-code/plugins, ~/.codex, home-dir
   config files, or anything outside provider scan dirs + the repo _archive.
 - Print every planned/performed action. Identical inputs -> identical plan.
+
+Set SKILLCTL_HOME to make "~" mean another directory, e.g. a throwaway one
+for tests and CI. Nothing then reads or writes the real home directory.
 """
 
 import argparse
@@ -35,9 +38,30 @@ UPSTREAM_CACHE_PATH = REPO_ROOT / "registry" / ".upstream-cache.json"
 ARCHIVE_ROOT = REPO_ROOT / "_archive"
 ARCHIVE_LOG = ARCHIVE_ROOT / "LOG.md"
 
-AGENTS_DIR = os.path.expanduser("~/.agents/skills")
-KIMI_DIR = os.path.expanduser("~/.kimi-code/skills")
-CLAUDE_PLUGINS_JSON = os.path.expanduser("~/.claude/plugins/installed_plugins.json")
+
+def home_dir():
+    """The home directory whose provider scan dirs skillctl manages.
+
+    SKILLCTL_HOME overrides it, so tests and CI can install into a throwaway
+    directory instead of the real ~/.agents, ~/.claude and ~/.kimi-code.
+    """
+    override = os.environ.get("SKILLCTL_HOME")
+    if override:
+        return os.path.normpath(os.path.abspath(override))
+    return os.path.normpath(os.path.expanduser("~"))
+
+
+def expand_home(path):
+    """os.path.expanduser() that honours SKILLCTL_HOME; returns a normpath."""
+    p = str(path)
+    if p == "~" or p.startswith(("~/", "~\\")):
+        return os.path.normpath(os.path.join(home_dir(), p[2:]))
+    return os.path.normpath(os.path.expanduser(p))
+
+
+AGENTS_DIR = expand_home("~/.agents/skills")
+KIMI_DIR = expand_home("~/.kimi-code/skills")
+CLAUDE_PLUGINS_JSON = expand_home("~/.claude/plugins/installed_plugins.json")
 
 # Provenance. The repo is a personal skill collection: only skills authored
 # here may live inside it. Third-party skills are tracked by the registry but
@@ -180,7 +204,7 @@ def canonical_path(skill, repo_root=REPO_ROOT):
     c = skill["canonical"]
     if c["type"] == "repo":
         return os.path.normpath(str(repo_root / c["path"]))
-    return os.path.normpath(os.path.expanduser(c["path"]))
+    return expand_home(c["path"])
 
 
 def expected_locations(skill, provider):
@@ -190,10 +214,10 @@ def expected_locations(skill, provider):
     if inst in BASE_INSTALLS:
         return [os.path.join(BASE_INSTALLS[inst], d)]
     if inst.startswith("junction:"):
-        return [os.path.normpath(os.path.expanduser(inst.split(":", 1)[1]))]
+        return [expand_home(inst.split(":", 1)[1])]
     if inst.startswith("path:"):
         # canonical lives directly at this provider-visible location
-        return [os.path.normpath(os.path.expanduser(inst.split(":", 1)[1]))]
+        return [expand_home(inst.split(":", 1)[1])]
     return []
 
 
@@ -204,12 +228,12 @@ def scan_provider_dirs(registry):
       'path', 'name' (dir entry name), 'real', 'is_link', 'fm' (or None),
       'container_child' (bool)}
     """
-    containers = {norm(os.path.expanduser(c)) for c in registry.get("containers", {})}
+    containers = {norm(expand_home(c)) for c in registry.get("containers", {})}
     out = {}
     for provider, pconf in registry["providers"].items():
         entries = []
         for scan in pconf["scan"]:
-            base = os.path.expanduser(scan)
+            base = expand_home(scan)
             if not os.path.isdir(base):
                 continue
             for name in sorted(os.listdir(base)):
@@ -598,7 +622,7 @@ def cmd_sync(args):
                     for loc in expected_locations(s, prov):
                         sel_paths.add(norm(loc))
             else:
-                sel_paths.add(norm(os.path.abspath(os.path.expanduser(token))))
+                sel_paths.add(norm(os.path.abspath(expand_home(token))))
 
         def selected(a):
             where = a.get("path") or a.get("link")
@@ -875,7 +899,7 @@ def cmd_update(args):
 # --------------------------------------------------------------------------
 
 def cmd_archive(args):
-    src = os.path.abspath(os.path.expanduser(args.path))
+    src = os.path.abspath(expand_home(args.path))
     if not os.path.exists(src) and not is_link(src):
         # is_link catches dangling junctions/symlinks whose target is gone
         print(f"path does not exist: {src}")
@@ -933,7 +957,7 @@ def registry_lock(timeout=15):
 def home_rel(path):
     """Collapse the user's home prefix to ~ for portable registry entries."""
     p = os.path.normpath(os.path.abspath(path))
-    home = os.path.normpath(os.path.expanduser("~"))
+    home = home_dir()
     if norm(p).startswith(norm(home) + os.sep):
         p = "~" + p[len(home):]
     return p.replace(os.sep, "/")
@@ -972,7 +996,7 @@ def infer_install(real_path):
     agents = norm(AGENTS_DIR)
     agents_sub = norm(os.path.join(AGENTS_DIR, "skills"))
     kimi = norm(KIMI_DIR)
-    claude = norm(os.path.expanduser("~/.claude/skills"))
+    claude = norm(expand_home("~/.claude/skills"))
     install = {"codex": "none", "kimi": "none", "claude": "none", "vscode": "none"}
     if rp.startswith(agents_sub + os.sep):
         install.update({"codex": "agents/skills", "kimi": "agents/skills",
@@ -985,7 +1009,7 @@ def infer_install(real_path):
         install["claude"] = "path:" + home_rel(real_path)
     if install["claude"] == "none":
         # already exposed to Claude Code by an existing junction?
-        cand = os.path.join(os.path.expanduser("~/.claude/skills"),
+        cand = os.path.join(expand_home("~/.claude/skills"),
                             os.path.basename(real_path.rstrip(os.sep)))
         if is_link(cand) and link_target(cand) == rp:
             install["claude"] = "junction:" + home_rel(cand)
@@ -1033,7 +1057,7 @@ def _cmd_register_impl(args):
 
     rows = []
     for raw in args.paths:
-        p = os.path.normpath(os.path.abspath(os.path.expanduser(raw)))
+        p = os.path.normpath(os.path.abspath(expand_home(raw)))
         sk = os.path.join(p, "SKILL.md")
         if not (os.path.isdir(p) and os.path.isfile(sk)):
             print(f"  ERROR not a skill directory (no SKILL.md): {p}")
@@ -1325,7 +1349,7 @@ def cmd_plugins(_args):
                 os.path.join(inst.get("installPath", ""), "skills")))
 
     print("kimi (~/.kimi-code/plugins/managed/*/kimi.plugin.json):")
-    managed = os.path.expanduser("~/.kimi-code/plugins/managed")
+    managed = expand_home("~/.kimi-code/plugins/managed")
     found_any = False
     if os.path.isdir(managed):
         for d in sorted(os.listdir(managed)):
