@@ -352,6 +352,20 @@ def archive_move(src, reason, dest_name=None, apply=False):
     return str(dest)
 
 
+def run_cmd_builtin(command, *paths):
+    """Run a cmd.exe builtin (mklink, rmdir) on paths.
+
+    Every path is quoted by hand: subprocess only quotes arguments that hold
+    spaces, and cmd.exe treats & | < > ^ in an unquoted one as syntax - a
+    path like C:\\R&D\\x split the command in two and ran the rest as a
+    command of its own. Output is decoded with the OEM code page cmd.exe
+    writes in, not UTF-8.
+    """
+    line = "cmd /c " + command + "".join(f' "{p}"' for p in paths)
+    return subprocess.run(line, capture_output=True, text=True,
+                          encoding="oem" if os.name == "nt" else "utf-8", errors="replace")
+
+
 def remove_link(path, apply=False):
     """Remove a junction/symlink itself (never the target).
 
@@ -363,8 +377,7 @@ def remove_link(path, apply=False):
     path = os.path.normpath(path)
     if not os.path.lexists(path):
         return
-    r = subprocess.run(["cmd", "/c", "rmdir", path], capture_output=True,
-                       text=True, encoding="utf-8", errors="replace")
+    r = run_cmd_builtin("rmdir", path)
     if r.returncode == 0 or not os.path.lexists(path):
         return
     # rmdir refuses some reparse points; remove the link entry directly.
@@ -381,8 +394,7 @@ def make_junction(link, target, apply=False):
     if apply:
         link, target = os.path.normpath(link), os.path.normpath(target)
         os.makedirs(os.path.dirname(link), exist_ok=True)
-        r = subprocess.run(["cmd", "/c", "mklink", "/J", link, target],
-                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        r = run_cmd_builtin("mklink /J", link, target)
         if r.returncode != 0:
             raise RuntimeError(f"mklink failed for {link}: {r.stdout} {r.stderr}")
 
@@ -1645,6 +1657,12 @@ def main(argv=None):
     ar.add_argument("--reason", default=None)
 
     args = ap.parse_args(argv)
+    # Paths and cmd.exe messages can hold characters a piped stdout (the ANSI
+    # code page) cannot encode; a report line must never abort a half-applied
+    # plan with UnicodeEncodeError.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     if getattr(args, "dry_run", False) and getattr(args, "apply", False):
         ap.error("--dry-run and --apply are mutually exclusive")
     if args.cmd == "register" and not args.scan and not args.paths:

@@ -64,8 +64,8 @@ def remove_tree(path):
 
 def make_junction(link, target):
     os.makedirs(os.path.dirname(link), exist_ok=True)
-    subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)],
-                   check=True, capture_output=True)
+    # quoted by hand: cmd.exe splits an unquoted path at & | < > ^
+    subprocess.run(f'cmd /c mklink /J "{link}" "{target}"', check=True, capture_output=True)
 
 
 def write_skill(directory, name, description="Test skill."):
@@ -360,6 +360,40 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertEqual(verify.returncode, 0, verify.stdout)
         audit = sb.run("audit", home=jhome)
         self.assertEqual(audit.returncode, 0, audit.stdout)
+
+    def test_paths_with_cmd_metacharacters_link_and_relink(self):
+        # cmd.exe treats & in an unquoted argument as a command separator
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.add_repo_skill("gamma")
+        sb.write_registry()
+        home = sb.root / "R&D"
+        home.mkdir()
+        make_junction(home / ".claude" / "skills" / "alpha", sb.repo / "gamma")
+
+        r = sb.run("sync", "--apply", home=home)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertLinksTo(home / ".agents" / "skills" / "alpha", sb.repo / "alpha")
+        self.assertLinksTo(home / ".claude" / "skills" / "alpha", sb.repo / "alpha")
+        self.assertNoPlan(sb, home=home)
+
+    def test_non_ascii_paths_do_not_crash_piped_output(self):
+        # Piped stdout uses the ANSI code page, which cannot encode every
+        # character a Windows path can hold (here "Ł" and "ź" under cp1252).
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.write_registry()
+        home = sb.root / "home-Łódź"
+        home.mkdir()
+        env = dict(os.environ, SKILLCTL_HOME=str(home),
+                   USERPROFILE=str(sb.decoy), HOME=str(sb.decoy))
+        for var in ("PYTHONIOENCODING", "PYTHONUTF8"):  # keep the default pipe encoding
+            env.pop(var, None)
+        r = subprocess.run([sys.executable, str(sb.repo / "tools" / "skillctl.py"),
+                            "sync", "--apply"], capture_output=True, env=env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn(b"Traceback", r.stderr)
+        self.assertLinksTo(home / ".claude" / "skills" / "alpha", sb.repo / "alpha")
 
     def test_register_through_a_linked_home_records_portable_paths(self):
         sb = Sandbox(self)
