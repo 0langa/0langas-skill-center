@@ -1,6 +1,6 @@
 ---
 name: windows-release-ritual
-description: Use when cutting, preparing, verifying, or fixing a release of a Windows desktop app or a versioned package in this workspace. Covers version bump surfaces, changelog as user-facing UI, tag and CI watch, artifact and checksum verification, installer/portable variants, verified in-app updater with rollback, code-signing status, and post-release ledger updates. Triggers - "cut a release", "ship v2.4.0", "prepare the changelog", "the release workflow failed", "the updater did not work", "publish the GitHub release", "bump the version".
+description: Use when cutting, preparing, verifying, or fixing a release of a Windows desktop app or a versioned package in this workspace. Covers version bump surfaces, changelog as user-facing UI, tag and CI watch, artifact and checksum verification, installer/portable variants, verified in-app updater with rollback, code-signing status, and post-release doc updates. Triggers - "cut a release", "ship v2.4.0", "prepare the changelog", "the release workflow failed", "the updater did not work", "publish the GitHub release", "bump the version".
 when_to_use: When preparing or publishing a version, writing release notes, debugging a release workflow or updater, or verifying that a published release is actually installable and upgradeable.
 type: prompt
 whenToUse: When preparing or publishing a version, writing release notes, debugging a release workflow or updater, or verifying that a published release is actually installable and upgradeable.
@@ -28,7 +28,7 @@ yourself and get an auth error, that is the cause.
 
 - All gates green on the release branch (see `repo-quality-gates`), including the
   device/E2E gates for every area this version touched.
-- Work ledger and docs updated; no half-finished item silently riding along.
+- Docs updated; no half-finished item silently riding along.
 - Previous release's known issues either fixed or restated in the new notes.
 
 ## 2. Bump every version surface
@@ -85,7 +85,8 @@ that did not happen.
 
 - Update `CHANGELOG.md` links, `README.md` current-version lines, docs that name
   the version.
-- Update the work ledger: close the release item, record deferrals.
+- Close the release item where it is tracked (issue or PR) and record deferrals
+  there or in the release notes.
 - Never run `git commit`, `git push`, `git tag`, `git reset` or `git rebase`
   unless the user explicitly asked for it in this session.
 
@@ -99,4 +100,4 @@ that did not happen.
 - [ ] Assets + checksums verified on the published release
 - [ ] Upgrade from previous version tested, rollback path confirmed
 - [ ] Unsigned status stated, not implied away
-- [ ] Docs and ledger updated
+- [ ] Docs updated, deferrals recorded

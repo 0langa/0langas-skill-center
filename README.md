@@ -57,7 +57,6 @@ Stack-specific skills for the projects in this workspace (Tauri/React/WebGPU des
 | Skill | Purpose | Provider compatibility |
 | --- | --- | --- |
 | `repo-quality-gates` | Finds the repo's canonical gate manifest and runs the correct gate set per stack before anything is called done, with the no-rerun anti-flake protocol and evidence-based reporting. | Codex, Claude Code, Kimi Code |
-| `autonomous-work-ledger` | Drives unattended and cross-session work through the BACKLOG / NEXT_STEPS / PROJECT_STATE / WORK_STATUS ledger: one item per cycle, gates, same-change doc updates, explicit stop conditions. | Codex, Claude Code, Kimi Code |
 | `windows-release-ritual` | End-to-end release of a Windows desktop app: version surfaces, changelog as user-facing UI, tag and CI watch, asset and checksum verification, updater and rollback proof, unsigned-binary honesty. | Codex, Claude Code, Kimi Code |
 | `determinism-and-golden-baselines` | Protects the preview/export determinism law, shared time chokepoints, preset purity, permanent persisted IDs, and the discipline for re-blessing pixel-hash, golden-trace, and snapshot baselines. | Codex, Claude Code, Kimi Code |
 | `persisted-format-migrations` | Numbered migration chains for SQLite, document JSON, settings, and cross-process JSONL contracts: never edit a shipped level, tolerate older producers, keep a fixture per shipped version. | Codex, Claude Code, Kimi Code |
