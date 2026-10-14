@@ -191,8 +191,9 @@ Removes the registry entry only — files stay in place by default, so the
 skill keeps working where it is installed but the doctor no longer tracks or
 repairs it. Add `--archive-canonical` (only on explicit user request) to also
 move the canonical copy into `_archive/`. Repo-canonical management skills
-(the skill-center's own) are refused for safety. Ask per skill; subset
-answers honored.
+(the skill-center's own) are refused for safety, and so is a canonical
+outside the provider scan dirs (a project repo such as usage-pulse). Ask
+per skill; subset answers honored.
 
 ### Step 5 — Verify + report
 
