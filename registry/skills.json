@@ -51,21 +51,6 @@
       }
     },
     {
-      "name": "autonomous-work-ledger",
-      "origin": "mine",
-      "canonical": {
-        "type": "repo",
-        "path": "autonomous-work-ledger"
-      },
-      "upstream": null,
-      "install": {
-        "codex": "junction:~/.agents/skills/autonomous-work-ledger",
-        "kimi": "junction:~/.agents/skills/autonomous-work-ledger",
-        "claude": "junction:~/.claude/skills/autonomous-work-ledger",
-        "vscode": "inherit"
-      }
-    },
-    {
       "name": "caveman",
       "origin": "mine",
       "canonical": {

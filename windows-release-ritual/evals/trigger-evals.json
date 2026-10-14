@@ -36,9 +36,7 @@
     "query": "Add a new download preset to the queue settings.",
     "should_trigger": false,
     "reason": "Feature work with no version, changelog, or publish surface involved.",
-    "competing_skills": [
-      "autonomous-work-ledger"
-    ],
+    "competing_skills": [],
     "expected_routing": "Do not trigger; this is normal feature work."
   }
 ]

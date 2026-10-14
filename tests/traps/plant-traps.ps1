@@ -29,12 +29,26 @@ Decoy skill for acceptance testing.
   [System.IO.File]::WriteAllText((Join-Path $dir 'SKILL.md'), $body, (New-Object System.Text.UTF8Encoding($false)))
 }
 
-# Native commands do not honour $ErrorActionPreference, so check the exit code:
-# a trap that silently failed to plant makes the whole test round meaningless.
+# No cmd.exe: PowerShell hands it a path without spaces unquoted, so a home
+# such as C:\R&D split the command at the "&", and cmd expands %VAR% even
+# inside quotes. New-Item throws on failure, so a trap that silently failed
+# to plant cannot make the test round meaningless.
 function New-Junction($link, $target) {
   New-Item -ItemType Directory -Force -Path (Split-Path $link) | Out-Null
-  cmd /c mklink /J "$link" "$target" | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "mklink /J failed: $link -> $target" }
+  New-Item -ItemType Junction -Path $link -Target $target | Out-Null
+}
+
+# Removes a junction itself, never its target: a non-recursive delete. Found
+# by listing its folder, since Test-Path is false for a dead link - the old
+# check left trap 8 in place and the next plant failed on it.
+function Remove-Junction($link) {
+  $leaf = Split-Path $link -Leaf
+  $item = Get-ChildItem -LiteralPath (Split-Path $link) -Force -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq $leaf }
+  if ($item) {
+    if (-not $item.LinkType) { throw "not a junction, refusing to remove: $link" }
+    [System.IO.Directory]::Delete($link)
+  }
 }
 
 # 1+2 registerable strays
@@ -52,8 +66,12 @@ Write-Skill "$A\draft-formatter" 'draft-formatter' $null
 # 7 name != dir
 Write-Skill "$A\json-fixer" 'quick-json' 'Repair and reformat broken JSON documents.'
 # 8 broken junction
-if (Test-Path "$A\legacy-link") { cmd /c rmdir "$A\legacy-link" | Out-Null }
-New-Junction "$A\legacy-link" "$A\_does-not-exist-anymore"
+Remove-Junction "$A\legacy-link"
+# New-Item needs the target to exist: make it, link it, then take it away
+$gone = "$A\_does-not-exist-anymore"
+New-Item -ItemType Directory -Force -Path $gone | Out-Null
+New-Junction "$A\legacy-link" $gone
+Remove-Item -LiteralPath $gone -Force
 # 9 claude-scope stray
 Write-Skill "$UserHome\.claude\skills\pdf-tools" 'pdf-tools' 'Merge, split, and extract text from PDF files.'
 # 10 vscode-scope stray
@@ -61,7 +79,7 @@ Write-Skill "$UserHome\.copilot\skills\snippet-vault" 'snippet-vault' 'Store and
 # 11 duplicate-name decoy (registry skill pulse:usage-report, different target)
 Write-Skill "$A\usage-report" 'pulse:usage-report' 'Older copy of the usage report skill kept around after a manual sync experiment.'
 # 12 wrong-target junction on an expected registry location
-if (Test-Path "$UserHome\.claude\skills\tri-client-skill-port") { cmd /c rmdir "$UserHome\.claude\skills\tri-client-skill-port" | Out-Null }
+Remove-Junction "$UserHome\.claude\skills\tri-client-skill-port"
 New-Junction "$UserHome\.claude\skills\tri-client-skill-port" (Join-Path $RepoRoot "muteman")
 # 13 ghost registry entry
 python -c @"
