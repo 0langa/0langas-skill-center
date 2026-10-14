@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 # SKILLCTL_HOME redirects "~" the same way tools/skillctl.py does, so the
 # user-level checks can run against a sandbox install instead of the real home.
-$UserHome = if ($env:SKILLCTL_HOME) { [System.IO.Path]::GetFullPath($env:SKILLCTL_HOME) } else { $HOME }
+$UserHome = if ($env:SKILLCTL_HOME) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($env:SKILLCTL_HOME) } else { $HOME }
 
 # The workflow skills are held to the full tri-client frontmatter contract and
 # the stricter eval thresholds; every other repo skill gets the shape checks.

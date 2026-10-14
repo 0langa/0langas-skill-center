@@ -4,7 +4,7 @@
 # the one exception is the tri-client-skill-port claude JUNCTION (repointed; restored by remove-traps.ps1 or `skillctl sync --apply`).
 # Set SKILLCTL_HOME to plant into a sandbox home instead of the real one; tools/skillctl.py honours the same variable.
 $ErrorActionPreference = 'Stop'
-$UserHome = if ($env:SKILLCTL_HOME) { [System.IO.Path]::GetFullPath($env:SKILLCTL_HOME) } else { $HOME }
+$UserHome = if ($env:SKILLCTL_HOME) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($env:SKILLCTL_HOME) } else { $HOME }
 $A = "$UserHome\.agents\skills"
 # Repo location is derived, never hardcoded: the repo has moved before and
 # hardcoded paths silently broke traps 12 and 13.
@@ -69,7 +69,7 @@ import json, os
 p = os.environ['SKILLCTL_REGISTRY']
 r = json.load(open(p, encoding='utf-8'))
 if not any(s['name'] == 'ghost-ledger' for s in r['skills']):
-    r['skills'].append({'name': 'ghost-ledger', 'canonical': {'type': 'path', 'path': '~/.agents/skills/ghost-ledger'}, 'upstream': None, 'install': {'codex': 'agents', 'kimi': 'agents', 'claude': 'none', 'vscode': 'agents'}})
+    r['skills'].append({'name': 'ghost-ledger', 'origin': 'unknown', 'canonical': {'type': 'path', 'path': '~/.agents/skills/ghost-ledger'}, 'upstream': None, 'install': {'codex': 'agents', 'kimi': 'agents', 'claude': 'none', 'vscode': 'agents'}})
     tmp = p + '.tmp'
     json.dump(r, open(tmp, 'w', encoding='utf-8', newline='\n'), indent=2, ensure_ascii=False)
     open(tmp, 'a', encoding='utf-8', newline='\n').write('\n')

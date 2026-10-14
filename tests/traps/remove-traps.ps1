@@ -2,7 +2,7 @@
 # Also safe to run if a test round archived the decoys (missing paths are skipped).
 # Honours SKILLCTL_HOME like plant-traps.ps1, so a sandbox round cleans up the sandbox.
 $ErrorActionPreference = 'Continue'
-$UserHome = if ($env:SKILLCTL_HOME) { [System.IO.Path]::GetFullPath($env:SKILLCTL_HOME) } else { $HOME }
+$UserHome = if ($env:SKILLCTL_HOME) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($env:SKILLCTL_HOME) } else { $HOME }
 $A = "$UserHome\.agents\skills"
 # Derived, never hardcoded - see plant-traps.ps1.
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
