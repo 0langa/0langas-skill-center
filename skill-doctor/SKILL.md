@@ -75,10 +75,11 @@ items and ask before executing. Only skip asking if the user explicitly said
   - archive → `archive <path>` once per confirmed item
   - unregister → `unregister <name> --apply` once per confirmed skill
     (add `--archive-canonical` only if the user asked for the files to go too)
-  - sync → junction create/repair actions are safe and can go together via
-    `sync --apply`; for a subset of repairs use `sync --only <path-or-name>
-    --apply` (repeatable); archive-type sync actions should be done piecemeal
-    with `archive <path>` so the user can cherry-pick
+  - sync → `sync --apply` executes the WHOLE plan, archive actions included,
+    so use it only when every action was approved. Otherwise apply the
+    approved repairs with `sync --only <path-or-name> --apply` (repeatable)
+    and the approved evictions piecemeal with `archive <path>` so the user
+    can cherry-pick
 - **Whatever the answer — yes, no, or partial — CONTINUE the sequence.**
   A "no" skips only that one step, never the rest of the request.
 
@@ -148,11 +149,17 @@ python <repo>/tools/skillctl.py sync --plan
 ```
 
 Show the plan. Split it mentally into (a) junction create/repair actions —
-safe, nothing is moved out — and (b) archive actions — evictions the user
-may want to cherry-pick. Ask, then apply accordingly: `sync --apply` for the
-repairs and/or `archive <path>` per approved eviction. Sync is idempotent:
-a second `--plan` must print zero actions. (`sync --dry-run` is an explicit
-alias for plan mode and errors when combined with `--apply`.)
+nothing is moved out, except that a real directory or file sitting where a
+junction belongs is archived first ("real directory occupies junction
+path") — and (b) archive actions — evictions the user may want to
+cherry-pick. `review` and `unfixable` lines change nothing: they need the
+user (register, restore, or unregister). Ask, then apply accordingly:
+`sync --apply` executes the whole plan, archives included, so use it only
+when everything was approved; otherwise `sync --only <path-or-name> --apply`
+for the approved repairs and `archive <path>` per approved eviction. Sync is
+idempotent: a second `--plan` must print no junction, relink or archive
+actions. (`sync --dry-run` is an explicit alias for plan mode and errors
+when combined with `--apply`.)
 
 ### Step 4 — Update from upstream (if requested or drift suspected)
 
@@ -169,7 +176,10 @@ python <repo>/tools/skillctl.py update --skill <name> --apply  # per skill (part
 ```
 
 Each update archives the current canonical into `_archive/` before replacing
-and snapshots the whole state first (label `pre-update`).
+and snapshots the whole state first (label `pre-update`). A tracked skill
+whose canonical is missing on this machine (plan says "not on this
+machine") is installed fresh from upstream - the way to restore those on a
+new PC.
 
 ### Step 4.5 — Unregister retired skills (if requested)
 
