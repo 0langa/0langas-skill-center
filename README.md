@@ -28,7 +28,8 @@ Every entry in `registry/skills.json` declares an `origin`:
 
 The rule is enforced, not just documented: `verify --ci` fails if any entry is
 missing an `origin`, carries an unrecognized one, or pairs a non-`mine` origin
-with `canonical.type: "repo"`. CI runs that check on every push, so a
+with `canonical.type: "repo"`, and if a skill folder in the repo has no
+repo-canonical registry entry at all. CI runs that check on every push, so a
 third-party skill cannot be committed into this repo by accident.
 
 `register` writes a path canonical, never a repo canonical, so adopting a skill
