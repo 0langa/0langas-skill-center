@@ -29,7 +29,7 @@ checkout's path: use that as `<repo>` instead.
 | Claude Code | `~/.claude/skills` (+ project `.claude/skills`, plugins) | by target; same target twice loads once | does NOT read `.agents`; plugin skills are namespaced `plugin:skill` |
 | VS Code Copilot | `~/.copilot/skills`, `~/.claude/skills`, `~/.agents/skills` | none | least critical |
 
-Install methods recorded in the registry: `agents` / `agents/skills` / `kimi`
+Install methods recorded in the registry: `agents` / `kimi`
 (must exist at that scan location), `junction:<path>` (junction at path ->
 canonical), `path:<abs>` (canonical lives directly at that provider-visible
 location), `plugin:<id>` (provided by an installed plugin, verify-only),

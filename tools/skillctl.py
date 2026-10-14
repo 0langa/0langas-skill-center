@@ -81,10 +81,11 @@ CLAUDE_PLUGINS_JSON = expand_home("~/.claude/plugins/installed_plugins.json")
 ORIGINS = ("mine", "vendored", "unknown")
 FOREIGN_ORIGINS = ("vendored", "unknown")
 
-# install-value bases (relative skill location inside a provider-visible tree)
+# install-value bases (relative skill location inside a provider-visible tree).
+# "agents/skills" is gone with the ~/.agents/skills/skills container it named:
+# no provider scans that folder, so verify --ci rejects such a row.
 BASE_INSTALLS = {
     "agents": AGENTS_DIR,
-    "agents/skills": os.path.join(AGENTS_DIR, "skills"),
     "kimi": KIMI_DIR,
 }
 
@@ -220,20 +221,36 @@ def check_origin_invariants(registry):
     """
     failures, unknowns = [], []
     for skill in registry.get("skills", []):
+        if not isinstance(skill, dict):
+            continue  # registry_failures reports the shape
         name = skill.get("name", "<unnamed>")
         origin = skill.get("origin")
         if origin is None:
             failures.append(f"'{name}': missing 'origin' (one of {', '.join(ORIGINS)})")
             continue
-        if origin not in ORIGINS:
-            failures.append(f"'{name}': invalid origin '{origin}' "
+        if not isinstance(origin, str) or origin not in ORIGINS:
+            failures.append(f"'{name}': invalid origin {origin!r} "
                             f"(expected one of {', '.join(ORIGINS)})")
             continue
         if origin in FOREIGN_ORIGINS:
-            if (skill.get("canonical") or {}).get("type") == "repo":
+            canon = skill.get("canonical")
+            canon = canon if isinstance(canon, dict) else {}
+            if canon.get("type") == "repo":
                 failures.append(
                     f"'{name}': origin '{origin}' but canonical type is 'repo' - "
                     f"only skills with origin 'mine' may live inside this repo")
+            elif canon.get("type") == "path" and isinstance(canon.get("path"), str):
+                # a "path" canonical spelled to land inside the repo is the
+                # same thing: third-party content stored here. Compared as
+                # strings, so verify --ci still never reads the home.
+                try:
+                    p = canonical_path(skill)
+                except ValueError:
+                    p = None  # escapes the home; registry_failures reports it
+                if p and is_within(norm(os.path.abspath(p)), norm(REPO_ROOT)):
+                    failures.append(
+                        f"'{name}': origin '{origin}' but its canonical {p} is inside "
+                        f"this repo - only skills with origin 'mine' may live here")
             if origin == "unknown":
                 unknowns.append(name)
     return failures, unknowns
@@ -291,6 +308,29 @@ def dir_problem(skill):
     return None
 
 
+def container_dirs(registry):
+    """Normalized paths of the declared containers; a malformed map counts as none."""
+    containers = registry.get("containers") or {}
+    if not isinstance(containers, (dict, list)):
+        return set()
+    return {norm(expand_home(c)) for c in containers if isinstance(c, str)}
+
+
+def scan_roots(registry, provider):
+    """Normalized scan dirs of one provider; a malformed entry counts as none."""
+    conf = registry["providers"].get(provider)
+    scans = conf.get("scan") if isinstance(conf, dict) else None
+    if not isinstance(scans, list):
+        return set()
+    return {norm(expand_home(s)) for s in scans if isinstance(s, str)}
+
+
+def visible_containers(containers, roots):
+    """The containers a provider sees: scan_provider_dirs() only descends into a
+    container that sits directly in one of the provider's scan dirs."""
+    return {c for c in containers if norm(os.path.dirname(c)) in roots}
+
+
 def location_problem(registry, provider, loc):
     """Why `loc` cannot be an install location for provider, or None.
 
@@ -301,12 +341,11 @@ def location_problem(registry, provider, loc):
     possibly every installed skill, to make room for one link.
     """
     loc = os.path.normpath(loc)
-    containers = {norm(expand_home(c)) for c in registry.get("containers", {})}
-    roots = {norm(expand_home(s)) for s in registry["providers"][provider].get("scan", [])}
-    if norm(os.path.dirname(loc)) not in roots | containers:
+    containers = container_dirs(registry)
+    roots = scan_roots(registry, provider)
+    if norm(os.path.dirname(loc)) not in roots | visible_containers(containers, roots):
         return f"{loc} is not directly inside a directory {provider} scans"
-    every = containers | {norm(expand_home(s)) for conf in registry["providers"].values()
-                          for s in conf.get("scan", [])}
+    every = containers.union(*(scan_roots(registry, p) for p in registry["providers"]))
     n = norm(loc)
     if any(r == n or r.startswith(n + os.sep) for r in every):
         return f"{loc} is a scan directory or a container, or holds one"
@@ -486,7 +525,14 @@ def run_cmd_builtin(command, *paths):
     path like C:\\R&D\\x split the command in two and ran the rest as a
     command of its own. Output is decoded with the OEM code page cmd.exe
     writes in, not UTF-8.
+
+    A path holding "%" is refused: cmd.exe expands %VAR% even inside quotes,
+    so C:\\x\\%TEMP%\\y would make or remove a link somewhere else entirely.
     """
+    for p in paths:
+        if "%" in str(p):
+            raise RuntimeError(f"refusing to pass a path holding '%' to cmd.exe, which "
+                               f"would expand it as a variable: {p}")
     line = "cmd /c " + command + "".join(f' "{p}"' for p in paths)
     return subprocess.run(line, capture_output=True, text=True,
                           encoding="oem" if os.name == "nt" else "utf-8", errors="replace")
@@ -503,16 +549,19 @@ def remove_link(path, apply=False):
     path = os.path.normpath(path)
     if not os.path.lexists(path):
         return
-    r = run_cmd_builtin("rmdir", path)
-    if r.returncode == 0 or not os.path.lexists(path):
-        return
-    # rmdir refuses some reparse points; remove the link entry directly.
-    for fn in (os.remove, os.rmdir):
+    if not is_link(path):
+        raise RuntimeError(f"not a link, refusing to remove it: {path}")
+    # os.rmdir removes a junction or directory symlink itself, never its
+    # target, and needs no cmd.exe; os.remove covers file symlinks.
+    for fn in (os.rmdir, os.remove):
         try:
             fn(path)
             return
         except OSError:
             continue
+    r = run_cmd_builtin("rmdir", path)
+    if r.returncode == 0 or not os.path.lexists(path):
+        return
     raise RuntimeError(f"could not remove link {path}: {r.stdout} {r.stderr}")
 
 
@@ -559,6 +608,30 @@ def make_junction(link, target, apply=False):
             raise RuntimeError(f"mklink failed for {link}: {r.stdout} {r.stderr}")
 
 
+def relink(link, target, apply=False):
+    """Point the link at `target`, keeping the old link until the new one exists.
+
+    Removing it first left the skill with no link at all whenever mklink then
+    failed. The new junction is made under a temporary name beside it and
+    renamed into place once the old link is gone.
+    """
+    if not apply:
+        return
+    link = os.path.normpath(link)
+    tmp = f"{link}.skillctl-relink"
+    i = 2
+    while os.path.lexists(tmp):
+        tmp = f"{link}.skillctl-relink-{i}"
+        i += 1
+    make_junction(tmp, target, apply=True)
+    try:
+        remove_link(link, apply=True)
+    except Exception:
+        remove_link(tmp, apply=True)
+        raise
+    os.rename(tmp, link)
+
+
 # --------------------------------------------------------------------------
 # audit
 # --------------------------------------------------------------------------
@@ -580,10 +653,13 @@ def cmd_audit(_args):
             + ", ".join(origin_unknowns))
 
     # 1. scan-dir findings
+    claimed = claimed_paths(registry)
     for provider, entries in scan.items():
         by_fm = {}
         for e in entries:
             skill = match_skill(registry, e, provider)
+            if skill is None and norm(e["path"]) in claimed:
+                continue  # another provider's location; reported for its owner
             if e["dangling"]:
                 owner = f"'{skill['name']}'" if skill else "no registry owner"
                 problems["broken"].append(
@@ -771,6 +847,7 @@ def build_plan(registry, archive_strays=False):
         unfixable[key] = a
         actions.append(a)
 
+    by_name = {s["name"]: s for s in registry["skills"]}
     for provider, entries in scan.items():
         by_fm = {}
         for e in entries:
@@ -779,11 +856,19 @@ def build_plan(registry, archive_strays=False):
                 # Broken link. If the registry claims this path, the repair
                 # pass below relinks it - archiving here would delete the link
                 # out from under that repair and leave the skill invisible.
-                if skill is not None or norm(e["path"]) in claimed:
+                # One that only points where a canonical should be is an
+                # alias no repair ever reaches; it used to be skipped forever.
+                if norm(e["path"]) in claimed:
                     continue
+                owner = (f"alias of '{skill['name']}' at no registry location"
+                         if skill else "no registry owner")
                 add_archive(e["path"], provider,
-                            f"dead link with no registry owner "
-                            f"(-> {os.path.realpath(e['path'])})")
+                            f"dead link with {owner} (-> {os.path.realpath(e['path'])})")
+                continue
+            if skill is None and norm(e["path"]) in claimed:
+                # Another provider's install location, seen by one that only
+                # inherits it (vscode reads ~/.claude/skills): the owner's
+                # repair pass below handles what is there.
                 continue
             if not e["is_dir"]:
                 add_archive(e["path"], provider, "stray non-skill file in scan dir")
@@ -804,13 +889,35 @@ def build_plan(registry, archive_strays=False):
                                 "stray directory without SKILL.md, not in registry")
                 continue
             if skill is None:
-                reason = f"stray skill '{e['fm']['name']}' not in registry"
-                if archive_strays:
-                    add_archive(e["path"], provider, reason)
+                # Only a valid skill with a name of its own can be adopted:
+                # `register` refuses broken frontmatter and skips a name the
+                # registry already has, so "review" would leave those forever.
+                fm_name = e["fm"]["name"] or e["name"]
+                twin = by_name.get(fm_name)
+                if e["fm"]["error"]:
+                    add_archive(e["path"], provider,
+                                f"stray skill folder with invalid frontmatter "
+                                f"({e['fm']['error']}), not in registry")
+                elif twin is not None and os.path.isdir(canonical_path(twin)):
+                    add_archive(e["path"], provider,
+                                f"stray copy of registered skill '{fm_name}' "
+                                f"(its canonical is {canonical_path(twin)})")
+                elif twin is not None:
+                    reason = (f"stray copy of registered skill '{fm_name}', whose canonical "
+                              f"{canonical_path(twin)} is missing")
+                    if archive_strays:
+                        add_archive(e["path"], provider, reason)
+                    else:  # possibly the only copy left: never archived by default
+                        add_review(e["path"], provider,
+                                   reason + " - move this copy there, or "
+                                   "`sync --archive-strays` to remove it")
+                elif archive_strays:
+                    add_archive(e["path"], provider,
+                                f"stray skill '{fm_name}' not in registry")
                 else:
                     add_review(e["path"], provider,
-                               reason + " - run `register` to adopt it, or "
-                               "`sync --archive-strays` to remove it")
+                               f"stray skill '{fm_name}' not in registry - run `register` "
+                               "to adopt it, or `sync --archive-strays` to remove it")
             else:
                 by_fm.setdefault(e["fm"]["name"] or e["name"], []).append(e)
         for _fm, es in sorted(by_fm.items()):
@@ -973,8 +1080,7 @@ def cmd_sync(args):
                 make_junction(a["link"], a["target"], apply=True)
                 print(f"         junction {a['link']} -> {a['target']}")
             elif a["op"] == "relink":
-                remove_link(a["link"], apply=True)
-                make_junction(a["link"], a["target"], apply=True)
+                relink(a["link"], a["target"], apply=True)
                 print(f"         relinked {a['link']} -> {a['target']}")
             elif a["op"] == "review":
                 pass  # reported only; never mutates the filesystem
@@ -1010,12 +1116,14 @@ def registry_failures(registry):
     failures = []
     scan_dirs = {}
     for provider, conf in providers.items():
-        scans = (conf or {}).get("scan")
-        if not isinstance(scans, list) or not scans:
+        scans = conf.get("scan") if isinstance(conf, dict) else None
+        if (not isinstance(scans, list) or not scans
+                or not all(isinstance(x, str) and x for x in scans)):
             failures.append(f"provider '{provider}': 'scan' must list at least one directory")
-            scans = []
-        scan_dirs[provider] = {norm(expand_home(s)) for s in scans}
-    containers = {norm(expand_home(c)) for c in registry.get("containers", {})}
+        scan_dirs[provider] = scan_roots(registry, provider)
+    if not isinstance(registry.get("containers") or {}, (dict, list)):
+        failures.append("registry: 'containers' must map container dirs to notes")
+    containers = container_dirs(registry)
     guarded = ([("the home directory", norm(os.path.abspath(home_dir()))),
                 ("this repo", norm(REPO_ROOT))]
                + [("a scan dir or container", d)
@@ -1024,20 +1132,21 @@ def registry_failures(registry):
     names, owners = {}, {}
     for i, s in enumerate(skills):
         name = s.get("name") if isinstance(s, dict) else None
-        if not name:
+        if not name or not isinstance(name, str):
             failures.append(f"skill #{i}: missing 'name'")
             continue
         names[name] = names.get(name, 0) + 1
         canon = s.get("canonical")
         if (not isinstance(canon, dict) or canon.get("type") not in ("repo", "path")
-                or not canon.get("path")):
+                or not canon.get("path") or not isinstance(canon["path"], str)):
+            canon = None
             failures.append(f"'{name}': canonical must be "
                             "{\"type\": \"repo\" or \"path\", \"path\": <path>}")
         elif canon["type"] == "repo":
             p = str(canon["path"])
             if os.path.isabs(p) or p.startswith("~") or ".." in re.split(r"[\\/]", p):
                 failures.append(f"'{name}': repo canonical '{p}' must be a path inside the repo")
-        if isinstance(canon, dict) and canon.get("type") in ("repo", "path") and canon.get("path"):
+        if canon is not None:
             # update --apply archives the canonical before replacing it
             try:
                 p = norm(os.path.abspath(canonical_path(s)))
@@ -1057,26 +1166,29 @@ def registry_failures(registry):
             if provider not in providers:
                 failures.append(f"'{name}': install names unknown provider '{provider}'")
                 continue
-            target = value.split(":", 1)[1] if isinstance(value, str) and ":" in value else ""
+            if not isinstance(value, str):
+                failures.append(f"'{name}': [{provider}] unknown install method {value!r}")
+                continue
+            target = value.split(":", 1)[1] if ":" in value else ""
             if value in BASE_INSTALLS:
                 if dir_problem(s):
                     failures.append(f"'{name}': {dir_problem(s)}")
                     continue
                 loc = os.path.normpath(os.path.join(BASE_INSTALLS[value], skill_dir_name(s)))
-            elif isinstance(value, str) and value.startswith(("junction:", "path:")) and target:
+            elif value.startswith(("junction:", "path:")) and target:
                 try:
                     loc = expand_home(target)
                 except ValueError as exc:
                     failures.append(f"'{name}': [{provider}] {exc}")
                     continue
-            elif value in ("inherit", "none") or (
-                    isinstance(value, str) and value.startswith("plugin:") and target):
+            elif value in ("inherit", "none") or (value.startswith("plugin:") and target):
                 continue
             else:
                 failures.append(f"'{name}': [{provider}] unknown install method {value!r}")
                 continue
             parent = os.path.dirname(loc)
-            if norm(parent) not in scan_dirs[provider] | containers:
+            if norm(parent) not in scan_dirs[provider] | visible_containers(containers,
+                                                                           scan_dirs[provider]):
                 failures.append(f"'{name}': [{provider}] {value} puts it in {parent}, "
                                 f"which {provider} does not scan")
             elif location_problem(registry, provider, loc):
@@ -1095,13 +1207,20 @@ def repo_content_failures(registry):
     """Every repo-canonical skill is here with frontmatter that names it, and
     every skill directory in the repo is registered as one."""
     failures = []
-    registered = set()
+    registered = set()  # repo canonicals
+    canonicals = set()  # every canonical, "path" ones included
     for s in registry.get("skills", []):
         canon = s.get("canonical") if isinstance(s, dict) else None
-        if not (isinstance(canon, dict) and canon.get("type") == "repo"
-                and canon.get("path") and s.get("name")):
+        if not (isinstance(canon, dict) and canon.get("type") in ("repo", "path")
+                and canon.get("path") and isinstance(canon["path"], str) and s.get("name")):
             continue
-        p = canonical_path(s)
+        try:
+            p = canonical_path(s)
+        except ValueError:
+            continue  # escapes the home; registry_failures reports it
+        canonicals.add(norm(p))
+        if canon["type"] != "repo":
+            continue  # a foreign one inside the repo is a provenance failure instead
         registered.add(norm(p))
         if s.get("bundle"):
             if not os.path.isdir(p):
@@ -1121,6 +1240,17 @@ def repo_content_failures(registry):
         if (d / "SKILL.md").is_file() and norm(d) not in registered:
             failures.append(f"{entry}/: skill directory is not in the registry "
                             f"(register it with origin 'mine' and canonical type 'repo')")
+        elif (d.is_dir() and norm(d) not in canonicals and not is_link(d)
+              and entry != ARCHIVE_ROOT.name and not entry.startswith(".")):
+            # A skill nested in a non-skill folder (vendor/x/SKILL.md) is
+            # repo content too; only the top level used to be checked.
+            # _archive/ holds what was moved out, and a skill's own
+            # subfolders are its content.
+            for rel in nested_skills(d, depth=3):
+                if norm(d / rel) not in canonicals:
+                    failures.append(f"{entry}/{rel}/: skill directory is not in the registry "
+                                    f"(register it with origin 'mine' and canonical type "
+                                    f"'repo', or move it out of the repo)")
     return failures
 
 
@@ -1422,13 +1552,17 @@ def find_unregistered(registry):
     distinct real target, providers in scan order. Read-only.
     """
     scan = scan_provider_dirs(registry)
+    claimed = claimed_paths(registry)
+    names = {s["name"] for s in registry["skills"]}
     found = {}
     for provider, entries in scan.items():
         for e in entries:
             if not e["is_dir"] or e["fm"] is None or e["fm"].get("error"):
                 continue
-            if match_skill(registry, e, provider) is not None:
+            if match_skill(registry, e, provider) is not None or norm(e["path"]) in claimed:
                 continue
+            if (e["fm"]["name"] or e["name"]) in names:
+                continue  # a copy of a registered skill: register would skip it
             key = norm(e["real"])
             row = found.setdefault(key, {
                 "name": e["fm"]["name"] or e["name"],
@@ -1442,25 +1576,27 @@ def find_unregistered(registry):
     return [found[k] for k in sorted(found, key=lambda k: found[k]["name"])]
 
 
-def infer_install(real_path):
+def infer_install(real_path, registry):
     """Default per-provider install values from where the skill lives.
 
-    real_path is resolved, so it is compared with resolved scan dirs.
+    real_path is resolved, so it is compared with resolved scan dirs. Only a
+    folder directly inside a scan dir is visible: one nested deeper gets no
+    install value that verify --ci would reject. A provider that already
+    sees the skill through a dir it scans gets "inherit", never "none" -
+    audit reports a "none" skill that a provider can see.
     """
     rp = norm(real_path)
+    parent = norm(os.path.dirname(rp))
     agents = resolved(AGENTS_DIR)
-    agents_sub = resolved(os.path.join(AGENTS_DIR, "skills"))
     kimi = resolved(KIMI_DIR)
     claude = resolved(expand_home("~/.claude/skills"))
-    install = {"codex": "none", "kimi": "none", "claude": "none", "vscode": "none"}
-    if rp.startswith(agents_sub + os.sep):
-        install.update({"codex": "agents/skills", "kimi": "agents/skills",
-                        "vscode": "agents/skills"})
-    elif rp.startswith(agents + os.sep):
+    install = {p: "none" for p in ("codex", "kimi", "claude", "vscode")}
+    install.update({p: "none" for p in registry["providers"] if p not in install})
+    if parent == agents:
         install.update({"codex": "agents", "kimi": "agents", "vscode": "agents"})
-    elif rp.startswith(kimi + os.sep):
+    elif parent == kimi:
         install["kimi"] = "kimi"
-    elif rp.startswith(claude + os.sep):
+    elif parent == claude:
         install["claude"] = "path:" + home_rel(real_path)
     if install["claude"] == "none":
         # already exposed to Claude Code by an existing junction?
@@ -1468,24 +1604,34 @@ def infer_install(real_path):
                             os.path.basename(real_path.rstrip(os.sep)))
         if is_link(cand) and link_target(cand) == rp:
             install["claude"] = "junction:" + home_rel(cand)
+    for provider, conf in registry["providers"].items():
+        if install.get(provider) != "none":
+            continue
+        for scan in (conf or {}).get("scan", []):
+            cand = os.path.join(expand_home(scan), os.path.basename(real_path.rstrip(os.sep)))
+            if os.path.isdir(cand) and resolved(cand) == rp:
+                install[provider] = "inherit"
+                break
     return install
 
 
-def build_path_entry(path, upstream, origin="unknown"):
+def build_path_entry(path, upstream, registry, origin="unknown"):
     """Registry entry for a skill directory (used by register/discover --fetch).
 
     Always a path canonical, never a repo canonical: adopting an existing skill
-    records where it already lives, it never copies it into this repo.
+    records where it already lives, it never copies it into this repo. Paths
+    keep the folder's own spelling: link_target() is normcased, which on
+    Windows stored every canonical and "dir" lowercased.
     """
     sk = os.path.join(path, "SKILL.md")
     fm = parse_frontmatter(sk)
-    real = link_target(path)
+    real = os.path.realpath(path)
     name = fm["name"] or os.path.basename(path)
     entry = {"name": name,
              "origin": origin,
              "canonical": {"type": "path", "path": home_rel(real)},
              "upstream": upstream,
-             "install": infer_install(real)}
+             "install": infer_install(real, registry)}
     dirname = os.path.basename(real.rstrip(os.sep))
     if dirname != name:
         entry["dir"] = dirname
@@ -1528,11 +1674,17 @@ def _cmd_register_impl(args):
             print(f"  skip  '{name}': already registered "
                   f"(canonical: {canonical_path(existing[0])})")
             continue
+        # the same skill twice in one call - repeated, or through a link -
+        # used to be added twice, a duplicate name verify --ci rejects
+        if any(r["name"] == name or resolved(expand_home(r["canonical"]["path"])) == real
+               for r in rows):
+            print(f"  skip  '{name}': already being added in this call")
+            continue
         up = None
         if upstream:  # default subpath: skills/<this skill's folder>, as discover records it
             up = dict(upstream, subpath=upstream["subpath"]
                       or f"skills/{os.path.basename(os.path.realpath(p))}")
-        rows.append(build_path_entry(p, up, getattr(args, "origin", "unknown")))
+        rows.append(build_path_entry(p, up, registry, getattr(args, "origin", "unknown")))
 
     print(f"skillctl register ({mode}) - {len(rows)} skill(s) to add")
     for e in rows:
@@ -1574,9 +1726,13 @@ def make_snapshot(label=None):
         for provider in registry["providers"]:
             inst = skill["install"].get(provider, "none")
             for loc in expected_locations(skill, provider):
-                if inst.startswith("junction:"):
-                    resolves = bool(is_link(loc) and link_target(loc) == canonical_target(skill))
-                elif inst.startswith("path:"):
+                # what verify accepts: a junction must also lead somewhere
+                # that exists, and a path install must hold a SKILL.md
+                # unless it is a bundle
+                if inst.startswith("junction:") and not (
+                        is_link(loc) and link_target(loc) == canonical_target(skill)):
+                    resolves = False
+                elif skill.get("bundle"):
                     resolves = os.path.isdir(loc)
                 else:
                     resolves = os.path.isfile(os.path.join(loc, "SKILL.md"))
@@ -1691,7 +1847,8 @@ def cmd_discover(args):
             if apply:
                 shutil.copytree(c["src"], dest)
                 entry = build_path_entry(dest, {"type": "github", "repo": c["repo"],
-                                                "subpath": c["subpath"], "ref": c["ref"]})
+                                                "subpath": c["subpath"], "ref": c["ref"]},
+                                         registry)
                 rows.append(entry)
                 vis = sorted({v for v in entry["install"].values() if v != "none"})
                 print(f"         copied and registered (canonical={entry['canonical']['path']}, install={vis})")

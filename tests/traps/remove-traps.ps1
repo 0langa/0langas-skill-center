@@ -12,19 +12,38 @@ foreach ($p in @("$A\markdown-toolbox", "$A\pr-review-buddy", "$A\old-python-scr
                  "$A\notes-backup.zip", "$A\skills\web-scraper-utils", "$A\draft-formatter",
                  "$A\json-fixer", "$A\usage-report",
                  "$UserHome\.claude\skills\pdf-tools", "$UserHome\.copilot\skills\snippet-vault")) {
-  if (Test-Path $p) { Remove-Item -Recurse -Force $p }
+  if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force }
+}
+# trap 5's container: removed once empty, never with anything else in it
+if ((Test-Path -LiteralPath "$A\skills") -and -not (Get-ChildItem -LiteralPath "$A\skills" -Force)) {
+  Remove-Item -LiteralPath "$A\skills" -Force
+}
+
+# No cmd.exe here: PowerShell hands it a path without spaces unquoted, so a
+# home such as C:\R&D split the command at the "&". Found by listing the
+# folder, since Test-Path is false for a dead link.
+function Remove-Junction($link) {
+  $leaf = Split-Path $link -Leaf
+  $item = Get-ChildItem -LiteralPath (Split-Path $link) -Force -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq $leaf }
+  if ($item -and $item.LinkType) { [System.IO.Directory]::Delete($link) }  # the link only
 }
 # broken junction (remove the link itself only)
-if (Test-Path "$A\legacy-link") { cmd /c rmdir "$A\legacy-link" | Out-Null }
+Remove-Junction "$A\legacy-link"
 # restore the tri-client-skill-port claude junction to its correct target
-cmd /c rmdir "$UserHome\.claude\skills\tri-client-skill-port" | Out-Null
-cmd /c mklink /J "$UserHome\.claude\skills\tri-client-skill-port" (Join-Path $RepoRoot "tri-client-skill-port") | Out-Null
+$triClient = "$UserHome\.claude\skills\tri-client-skill-port"
+Remove-Junction $triClient
+if (-not (Test-Path -LiteralPath $triClient)) {
+  New-Item -ItemType Directory -Force -Path (Split-Path $triClient) | Out-Null
+  New-Item -ItemType Junction -Path $triClient -Target (Join-Path $RepoRoot "tri-client-skill-port") | Out-Null
+}
 # remove ghost registry entry + any decoy registrations the agent may have added
 python -c @"
 import json, os
 p = os.environ['SKILLCTL_REGISTRY']
 r = json.load(open(p, encoding='utf-8'))
-drop = {'ghost-ledger', 'markdown-toolbox', 'pr-review-buddy', 'web-scraper-utils', 'pdf-tools', 'snippet-vault'}
+drop = {'ghost-ledger', 'markdown-toolbox', 'pr-review-buddy', 'web-scraper-utils', 'pdf-tools', 'snippet-vault',
+        'quick-json'}
 before = len(r['skills'])
 r['skills'] = [s for s in r['skills'] if s['name'] not in drop]
 tmp = p + '.tmp'

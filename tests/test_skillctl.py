@@ -250,6 +250,9 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertEqual(ops[0], ("archive", str(sb.agents("alpha"))),
                          "the occupant must be moved out before the junction is created")
         self.assertIn(("junction", str(sb.agents("alpha"))), ops)
+        # vscode only inherits alpha, and used to add "review: register it"
+        self.assertNotIn("review", [op for op, _path in ops])
+        self.assertNotIn("is not in the registry", sb.run("audit").stdout)
         r = sb.run("sync", "--apply")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertLinksTo(sb.agents("alpha"), sb.repo / "alpha")
@@ -294,6 +297,80 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertTrue((sb.agents("newcomer") / "SKILL.md").is_file())
         self.assertEqual(sb.archived(), [])
         self.assertIn("review", [op for op, *_ in sb.plan()])
+
+    def test_review_is_only_for_strays_register_can_adopt(self):
+        # register refuses broken frontmatter and skips a registered name, so
+        # "review: run register" left these in place for good
+        sb = Sandbox(self)
+        sb.add_path_skill("beta")
+        sb.add_path_skill("gone", create=False)
+        sb.write_registry()
+        kimi = sb.home / ".kimi-code" / "skills"
+        write_skill(kimi / "beta-copy", "beta", "Stale copy.")
+        write_skill(kimi / "gone-copy", "gone", "Possibly the only copy left.")
+        draft = write_skill(sb.agents("draft"), "draft")
+        (draft / "SKILL.md").write_text("---\nname: draft\n---\n", encoding="utf-8")
+        write_skill(sb.agents("newcomer"), "newcomer")
+
+        plan = {path: (op, why) for op, _prov, path, why in sb.plan()}
+        self.assertEqual(plan[str(kimi / "beta-copy")][0], "archive")
+        self.assertIn("copy of registered skill 'beta'", plan[str(kimi / "beta-copy")][1])
+        self.assertEqual(plan[str(sb.agents("draft"))][0], "archive")
+        self.assertIn("invalid frontmatter", plan[str(sb.agents("draft"))][1])
+        self.assertEqual(plan[str(kimi / "gone-copy")][0], "review")
+        self.assertIn("is missing", plan[str(kimi / "gone-copy")][1])
+        self.assertEqual(plan[str(sb.agents("newcomer"))][0], "review")
+
+        sb.run("sync", "--apply")
+        self.assertEqual(sorted(sb.archived()), ["codex,kimi,vscode-draft", "kimi-beta-copy"])
+        self.assertTrue((kimi / "gone-copy" / "SKILL.md").is_file())
+        self.assertTrue((sb.agents("newcomer") / "SKILL.md").is_file())
+        scan = sb.run("register", "--scan")
+        self.assertIn("newcomer", scan.stdout)
+        self.assertNotIn("gone-copy", scan.stdout, "register would only skip a registered name")
+
+    def test_dead_alias_of_a_skill_is_archived_not_skipped_forever(self):
+        # It points where beta's canonical belongs, so it matched beta by
+        # target and was left for a repair pass that never looks there.
+        sb = Sandbox(self)
+        sb.add_path_skill("beta", create=False)
+        sb.write_registry()
+        make_junction(sb.claude("beta-old"), sb.agents("beta"))
+        self.assertFalse(os.path.exists(sb.claude("beta-old")))
+
+        self.assertIn(("archive", str(sb.claude("beta-old"))),
+                      [(op, path) for op, _prov, path, _why in sb.plan()])
+        sb.run("sync", "--apply")
+        self.assertFalse(os.path.lexists(sb.claude("beta-old")))
+        self.assertEqual(sb.archived(), ["claude,vscode-beta-old"])
+        self.assertFalse(os.path.lexists(sb.claude("beta")), "made a junction to nothing")
+
+    def test_relink_keeps_the_old_link_when_the_new_one_cannot_be_made(self):
+        # cmd.exe expands %VAR% even inside quotes: under a home named
+        # "%OS%-home" mklink and rmdir worked on "Windows_NT-home" instead,
+        # and relink had already removed the old link when mklink failed.
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.add_repo_skill("gamma")
+        sb.write_registry()
+        plain = sb.root / "pct-home"
+        make_junction(plain / ".claude" / "skills" / "alpha", sb.repo / "gamma")
+        home = sb.root / "%OS%-home"
+        os.rename(plain, home)  # the test's own mklink would expand it too
+        elsewhere = sb.root / "Windows_NT-home"
+        (elsewhere / ".agents" / "skills").mkdir(parents=True)
+        (elsewhere / ".claude" / "skills").mkdir(parents=True)
+
+        r = sb.run("sync", "--apply", home=home)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("holding '%'", r.stdout)
+        old = home / ".claude" / "skills" / "alpha"
+        self.assertTrue(is_link(old), "relink removed the old link before mklink failed")
+        self.assertTrue(same_path(old, sb.repo / "gamma"))
+        for d in (elsewhere / ".agents" / "skills", elsewhere / ".claude" / "skills"):
+            self.assertEqual(list(d.iterdir()), [], f"a link was made in {d}")
+        self.assertEqual([p.name for p in old.parent.iterdir()], ["alpha"],
+                         "a temporary relink junction was left behind")
 
     def test_folder_of_nested_skills_is_reviewed_not_archived(self):
         # e.g. a clone of a skills repo, or the old ~/.agents/skills/skills
@@ -686,6 +763,67 @@ class InstallAndRepairTest(unittest.TestCase):
         (entry,) = sb.registry()["skills"]
         self.assertEqual(entry["upstream"]["subpath"], "skills/upskill")
 
+    def test_register_keeps_the_folder_spelling_and_adds_each_skill_once(self):
+        # Paths came from the normcased link target: on Windows the canonical
+        # and "dir" were stored lowercased. One call naming a skill twice, or
+        # through a link, added it twice.
+        sb = Sandbox(self)
+        sb.write_registry()
+        write_skill(sb.agents("Mixed-Case"), "Mixed-Case")
+        make_junction(sb.claude("Mixed-Case"), sb.agents("Mixed-Case"))
+
+        r = sb.run("register", str(sb.agents("Mixed-Case")), str(sb.agents("Mixed-Case")),
+                   str(sb.claude("Mixed-Case")), "--origin", "vendored", "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        (entry,) = sb.registry()["skills"]
+        self.assertEqual(entry["canonical"]["path"], "~/.agents/skills/Mixed-Case")
+        self.assertNotIn("dir", entry)
+        self.assertEqual(entry["install"]["claude"], "junction:~/.claude/skills/Mixed-Case")
+        self.assertEqual(sb.run("verify", "--ci").returncode, 0)
+        audit = sb.run("audit")
+        self.assertEqual(audit.returncode, 0, audit.stdout)
+
+    def test_register_never_writes_none_for_a_provider_that_sees_the_skill(self):
+        # vscode scans ~/.claude/skills: "none" there made audit report the
+        # freshly registered skill as "marked 'none' but visible"
+        sb = Sandbox(self)
+        sb.write_registry()
+        write_skill(sb.claude("claude-only"), "claude-only")
+        r = sb.run("register", str(sb.claude("claude-only")), "--origin", "vendored", "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        (entry,) = sb.registry()["skills"]
+        self.assertEqual(entry["install"], {"codex": "none", "kimi": "none", "vscode": "inherit",
+                                            "claude": "path:~/.claude/skills/claude-only"})
+        audit = sb.run("audit")
+        self.assertEqual(audit.returncode, 0, audit.stdout)
+
+    def test_register_writes_no_install_value_verify_ci_rejects(self):
+        # A skill nested below a scan dir (the retired ~/.agents/skills/skills
+        # mirror) got "agents/skills", which no provider scans.
+        sb = Sandbox(self)
+        sb.write_registry()
+        write_skill(sb.agents("skills") / "mirrored", "mirrored")
+        r = sb.run("register", str(sb.agents("skills") / "mirrored"),
+                   "--origin", "vendored", "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        (entry,) = sb.registry()["skills"]
+        self.assertEqual(set(entry["install"].values()), {"none"})
+        ci = sb.run("verify", "--ci")
+        self.assertEqual(ci.returncode, 0, ci.stdout)
+        sb.skills = [dict(entry, install=dict(entry["install"], codex="agents/skills"))]
+        sb.write_registry()
+        self.assertIn("unknown install method 'agents/skills'", sb.run("verify", "--ci").stdout)
+
+    def test_snapshot_marks_a_dead_junction_as_not_resolving(self):
+        sb = Sandbox(self)
+        sb.add_path_skill("beta", create=False)
+        sb.write_registry()
+        make_junction(sb.claude("beta"), sb.agents("beta"))  # where beta belongs, but dead
+        self.assertEqual(sb.run("snapshot").returncode, 0)
+        (snap,) = (sb.repo / "_archive" / "snapshots").iterdir()
+        links = json.loads((snap / "link-map.json").read_text(encoding="utf-8"))
+        self.assertEqual({(m["skill"], m["resolves"]) for m in links["claude"]}, {("beta", False)})
+
     def test_plan_and_apply_are_mutually_exclusive(self):
         # --plan used to be ignored, so `sync --plan --apply` applied
         sb = Sandbox(self)
@@ -962,6 +1100,60 @@ class VerifyCiTest(unittest.TestCase):
             self.assertTrue(any(needle in f for f in failures), f"no failure for {needle!r}")
         self.assertFalse([f for f in failures if f.startswith("FAIL: 'alpha'")],
                          "the valid entry was flagged")
+
+    def test_third_party_content_cannot_hide_in_the_repo(self):
+        # Only top-level folders were checked, and a "path" canonical spelled
+        # into the repo passed the provenance rule a "repo" one fails.
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        write_skill(sb.repo / "vendor" / "lib" / "hidden", "hidden")
+        write_skill(sb.repo / "pack" / "inside", "inside")
+        sb.add_path_skill("inside", create=False)["canonical"]["path"] = str(sb.repo / "pack" / "inside")
+        write_skill(sb.repo / "_archive" / "20260101" / "old", "old")  # moved out, not content
+        write_skill(sb.repo / "alpha" / "examples" / "template", "template")  # alpha's own
+        sb.write_registry()
+
+        r = self.run_ci(sb.repo / "tools" / "skillctl.py", sb.home)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("vendor/lib/hidden/: skill directory is not in the registry", r.stdout)
+        self.assertIn("'inside': origin 'vendored' but its canonical", r.stdout)
+        self.assertNotIn("pack/inside/: skill directory", r.stdout, "it is registered")
+        self.assertNotIn("_archive", r.stdout)
+        self.assertNotIn("template", r.stdout)
+
+    def test_a_container_counts_only_for_providers_that_scan_its_parent(self):
+        # claude never looks inside ~/.agents/skills, so a claude location in
+        # a container there is invisible to it
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")["install"]["claude"] = "junction:~/.agents/skills/mirror/alpha"
+        sb.write_registry(containers={"~/.agents/skills/mirror": "nested mirror"})
+        r = self.run_ci(sb.repo / "tools" / "skillctl.py", sb.home)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("'alpha': [claude] junction:~/.agents/skills/mirror/alpha puts it in", r.stdout)
+        sb.skills[0]["install"].update({"claude": "none",
+                                        "codex": "junction:~/.agents/skills/mirror/alpha"})
+        sb.write_registry(containers={"~/.agents/skills/mirror": "nested mirror"})
+        r = self.run_ci(sb.repo / "tools" / "skillctl.py", sb.home)
+        self.assertNotIn("[codex]", r.stdout, "codex scans ~/.agents/skills, so it sees the mirror")
+
+    def test_malformed_registry_shapes_are_failures_not_tracebacks(self):
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.skills += ["not-an-object",
+                      {"name": "listy", "origin": ["mine"], "canonical": {"type": "path", "path": 7},
+                       "install": {"codex": ["agents"]}},
+                      {"name": "odd-canon", "origin": "vendored", "canonical": "~/.agents/skills/x",
+                       "install": {"claude": {"junction": "~/.claude/skills/x"}}}]
+        providers = dict(PROVIDERS, broken=None)
+        sb.write_registry(providers=providers, containers="~/.agents/skills/mirror")
+        r = self.run_ci(sb.repo / "tools" / "skillctl.py", sb.home)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+        for needle in ("skill #1: missing 'name'", "'listy': canonical must be",
+                       "'listy': [codex] unknown install method ['agents']",
+                       "'listy': invalid origin ['mine']", "'odd-canon': canonical must be",
+                       "provider 'broken': 'scan' must list", "'containers' must map"):
+            self.assertIn(needle, r.stdout)
 
 
 if __name__ == "__main__":
