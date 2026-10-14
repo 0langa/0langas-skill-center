@@ -46,7 +46,8 @@ def is_link(path):
     except OSError:
         return False
     return (stat.S_ISLNK(st.st_mode)
-            or getattr(st, "st_reparse_tag", 0) == stat.IO_REPARSE_TAG_MOUNT_POINT)
+            or getattr(st, "st_reparse_tag", 0)
+            == getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003))
 
 
 def remove_tree(path):
@@ -139,6 +140,7 @@ class Sandbox:
         env["SKILLCTL_HOME"] = str(home or self.home)
         env["USERPROFILE"] = str(self.decoy)
         env["HOME"] = str(self.decoy)
+        env["PYTHONIOENCODING"] = "utf-8"  # the pipe would otherwise be cp1252
         return subprocess.run([sys.executable, str(self.repo / "tools" / "skillctl.py"), *args],
                               capture_output=True, text=True, encoding="utf-8",
                               errors="replace", env=env, cwd=str(self.root))
@@ -146,6 +148,8 @@ class Sandbox:
     def plan(self, *extra, home=None):
         """[(op, providers, path, reason)] from `sync --plan`."""
         r = self.run("sync", "--plan", *extra, home=home)
+        # a crashed plan must not read as an empty, converged one
+        assert r.returncode == 0 and "Traceback" not in r.stderr, r.stdout + r.stderr
         return [m.groups() for m in map(PLAN_LINE.match, r.stdout.splitlines()) if m]
 
     # -- filesystem helpers -----------------------------------------------
@@ -365,6 +369,54 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertEqual(sb.run("verify").returncode, 0)
         self.assertEqual(sb.run("audit").returncode, 0)
         self.assertNoPlan(sb)
+
+    def test_canonical_seen_through_a_linked_scan_dir_is_left_alone(self):
+        # ~/.claude/skills itself a junction to ~/.agents/skills: the claude
+        # location of beta *is* its canonical. An earlier revision of this
+        # branch archived it as "a real directory in the way".
+        sb = Sandbox(self)
+        sb.add_path_skill("beta")
+        sb.write_registry()
+        make_junction(sb.home / ".claude" / "skills", sb.home / ".agents" / "skills")
+
+        self.assertEqual([op for op, *_ in sb.plan()], [])
+        self.assertEqual(sb.run("sync", "--apply").returncode, 0)
+        self.assertTrue((sb.agents("beta") / "SKILL.md").is_file())
+        self.assertFalse(is_link(sb.agents("beta")))
+        self.assertEqual(sb.archived(), [])
+
+    def test_invalid_install_locations_never_archive_anything(self):
+        # One-character registry typos that pointed a link at a scan root,
+        # the home, or the current directory.
+        for value in ("junction:~/.agents/skills", "junction:~", "junction:~/.agents"):
+            with self.subTest(value=value):
+                sb = Sandbox(self)
+                sb.add_path_skill("beta")
+                sb.add_repo_skill("alpha")["install"]["claude"] = value
+                sb.write_registry()
+                r = sb.run("sync", "--apply")
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertIn("is not directly inside a directory claude scans", r.stdout)
+                self.assertEqual(sb.archived(), [])
+                self.assertTrue((sb.agents("beta") / "SKILL.md").is_file())
+        sb = Sandbox(self)
+        sb.add_path_skill("beta")
+        sb.add_repo_skill("alpha")
+        sb.skills[-1].update({"dir": "", "install": {"codex": "agents", "kimi": "none",
+                                                      "claude": "none", "vscode": "none"}})
+        sb.write_registry()
+        self.assertEqual(sb.run("sync", "--apply").returncode, 1)
+        self.assertEqual(sb.archived(), [])
+        self.assertTrue((sb.agents("beta") / "SKILL.md").is_file())
+        ci = sb.run("verify", "--ci")
+        self.assertEqual(ci.returncode, 1, "verify --ci must refuse dir '' too")
+
+    def test_home_relative_paths_cannot_escape_the_home(self):
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")["install"]["claude"] = "junction:~//.claude/skills/alpha"
+        sb.write_registry()
+        self.assertEqual(sb.run("sync", "--apply").returncode, 0)
+        self.assertLinksTo(sb.claude("alpha"), sb.repo / "alpha")
 
     def test_home_reached_through_a_junction_is_idempotent(self):
         # Folder redirection, a moved profile, or an 8.3 spelling such as

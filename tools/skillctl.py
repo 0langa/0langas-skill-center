@@ -53,10 +53,18 @@ def home_dir():
 
 
 def expand_home(path):
-    """os.path.expanduser() that honours SKILLCTL_HOME; returns a normpath."""
+    """os.path.expanduser() that honours SKILLCTL_HOME; returns a normpath.
+
+    What follows "~/" stays under the home: extra leading separators are
+    dropped (os.path.join would otherwise restart at the drive root) and a
+    drive-qualified remainder is refused.
+    """
     p = str(path)
     if p == "~" or p.startswith(("~/", "~\\")):
-        return os.path.normpath(os.path.join(home_dir(), p[2:]))
+        rest = p[2:].lstrip("/\\")
+        if os.path.splitdrive(rest)[0]:
+            raise ValueError(f"path escapes the home directory: {p}")
+        return os.path.normpath(os.path.join(home_dir(), rest))
     return os.path.normpath(os.path.expanduser(p))
 
 
@@ -104,7 +112,7 @@ def is_link(path):
         return False
     if stat.S_ISLNK(st.st_mode):
         return True
-    return getattr(st, "st_reparse_tag", 0) == stat.IO_REPARSE_TAG_MOUNT_POINT
+    return getattr(st, "st_reparse_tag", 0) == getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003)
 
 
 def resolved(path):
@@ -250,6 +258,21 @@ def expected_locations(skill, provider):
         # canonical lives directly at this provider-visible location
         return [expand_home(inst.split(":", 1)[1])]
     return []
+
+
+def location_problem(registry, provider, loc):
+    """Why `loc` cannot be an install location for provider, or None.
+
+    It must sit directly inside a directory the provider scans (or a
+    declared container). Anything else - "junction:~", a scan root itself,
+    a "dir" of "" or ".." - would have sync archive whatever is there,
+    possibly every installed skill, to make room for one link.
+    """
+    roots = {norm(expand_home(s)) for s in registry["providers"][provider].get("scan", [])}
+    roots |= {norm(expand_home(c)) for c in registry.get("containers", {})}
+    if norm(os.path.dirname(os.path.normpath(loc))) not in roots:
+        return f"{os.path.normpath(loc)} is not directly inside a directory {provider} scans"
+    return None
 
 
 def scan_provider_dirs(registry):
@@ -652,19 +675,26 @@ def build_plan(registry, archive_strays=False):
 
     unfixable = {}  # (skill, canonical) -> action: one line however many providers
 
-    def add_unfixable(skill, canon, provider):
-        key = (skill["name"], norm(canon))
+    def add_unfixable(skill, canon, provider, reason=None):
+        key = (skill["name"], norm(canon), reason)
         if key in unfixable:
             unfixable[key]["provider"] += f",{provider}"
             return
         a = {"op": "unfixable", "provider": provider,
-             "reason": f"'{skill['name']}' canonical missing at {canon}"}
+             "reason": reason or f"'{skill['name']}' canonical missing at {canon}"}
         unfixable[key] = a
         actions.append(a)
 
     def plan_link(skill, loc, canon, provider, kind, note=""):
         """Plan whatever turns `loc` into a link to `canon`."""
         name = skill["name"]
+        target = canonical_target(skill)
+        if resolved(loc) == target:
+            return  # already the canonical, e.g. seen through a linked scan dir
+        if target.startswith(resolved(loc) + os.sep):
+            add_unfixable(skill, loc, provider,
+                          f"'{name}': {kind} path {loc} contains the canonical {canon}")
+            return
         if is_link(loc):
             if link_target(loc) != canonical_target(skill):
                 add_link_action("relink", loc, canon, provider,
@@ -685,7 +715,11 @@ def build_plan(registry, archive_strays=False):
         canon = canonical_path(skill)
         for provider in registry["providers"]:
             inst = skill["install"].get(provider, "none")
-            if inst in BASE_INSTALLS:
+            locs = expected_locations(skill, provider)
+            problem = location_problem(registry, provider, locs[0]) if locs else None
+            if problem:
+                add_unfixable(skill, locs[0], provider, f"'{skill['name']}': {problem}")
+            elif inst in BASE_INSTALLS:
                 loc = expected_locations(skill, provider)[0]
                 if os.path.isfile(os.path.join(loc, "SKILL.md")):
                     pass  # visible to the provider already
@@ -848,9 +882,13 @@ def registry_failures(registry):
                 continue
             target = value.split(":", 1)[1] if isinstance(value, str) and ":" in value else ""
             if value in BASE_INSTALLS:
-                loc = os.path.join(BASE_INSTALLS[value], skill_dir_name(s))
+                loc = os.path.normpath(os.path.join(BASE_INSTALLS[value], skill_dir_name(s)))
             elif isinstance(value, str) and value.startswith(("junction:", "path:")) and target:
-                loc = expand_home(target)
+                try:
+                    loc = expand_home(target)
+                except ValueError as exc:
+                    failures.append(f"'{name}': [{provider}] {exc}")
+                    continue
             elif value in ("inherit", "none") or (
                     isinstance(value, str) and value.startswith("plugin:") and target):
                 continue
