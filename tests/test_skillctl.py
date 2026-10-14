@@ -1108,7 +1108,10 @@ class VerifyCiTest(unittest.TestCase):
         sb.add_repo_skill("alpha")
         write_skill(sb.repo / "vendor" / "lib" / "hidden", "hidden")
         write_skill(sb.repo / "pack" / "inside", "inside")
-        sb.add_path_skill("inside", create=False)["canonical"]["path"] = str(sb.repo / "pack" / "inside")
+        # spelled as skillctl spells the repo: resolved, so a CI runner's 8.3
+        # temp dir (C:\Users\RUNNER~1) reads as its long name
+        inside = str(sb.repo.resolve() / "pack" / "inside")
+        sb.add_path_skill("inside", create=False)["canonical"]["path"] = inside
         write_skill(sb.repo / "_archive" / "20260101" / "old", "old")  # moved out, not content
         write_skill(sb.repo / "alpha" / "examples" / "template", "template")  # alpha's own
         sb.write_registry()
