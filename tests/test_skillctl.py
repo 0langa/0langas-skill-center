@@ -579,6 +579,36 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual([s["name"] for s in sb.registry()["skills"]], ["plugin-project"])
 
+    def test_register_upstream_without_subpath_records_the_skill_folder(self):
+        sb = Sandbox(self)
+        sb.write_registry()
+        write_skill(sb.agents("upskill"), "upskill")
+        r = sb.run("register", str(sb.agents("upskill")), "--upstream", "someone/skills",
+                   "--origin", "vendored", "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        (entry,) = sb.registry()["skills"]
+        self.assertEqual(entry["upstream"]["subpath"], "skills/upskill")
+
+    def test_plan_and_apply_are_mutually_exclusive(self):
+        # --plan used to be ignored, so `sync --plan --apply` applied
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.write_registry()
+        r = sb.run("sync", "--plan", "--apply")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertFalse(os.path.lexists(sb.claude("alpha")))
+
+    def test_archiving_the_same_name_twice_in_a_day_does_not_collide(self):
+        # the free-name check followed links, so an archived dead link
+        # looked absent and the second move hit WinError 183
+        sb = Sandbox(self)
+        sb.write_registry()
+        for _ in range(2):
+            make_junction(sb.agents("ghost"), sb.root / "gone")
+            r = sb.run("sync", "--apply")
+            self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(sb.archived(), ["codex,kimi,vscode-ghost", "codex,kimi,vscode-ghost-2"])
+
     def test_unregister_keeps_files_and_refuses_to_archive_repo_content(self):
         sb = Sandbox(self)
         sb.add_repo_skill("alpha")

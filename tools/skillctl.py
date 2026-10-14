@@ -380,7 +380,7 @@ def archive_move(src, reason, dest_name=None, apply=False):
     name = dest_name or os.path.basename(src.rstrip(os.sep))
     dest = dest_dir / name
     i = 2
-    while dest.exists():
+    while os.path.lexists(dest):  # exists() follows links: an archived dead link looked free
         dest = dest_dir / f"{name}-{i}"
         i += 1
     if apply:
@@ -1397,8 +1397,7 @@ def _cmd_register_impl(args):
     upstream = None
     if args.upstream:
         repo, _, subpath = args.upstream.partition(":")
-        upstream = {"type": "github", "repo": repo,
-                    "subpath": subpath or "skills/<name>", "ref": "main"}
+        upstream = {"type": "github", "repo": repo, "subpath": subpath, "ref": "main"}
 
     rows = []
     for raw in args.paths:
@@ -1419,7 +1418,11 @@ def _cmd_register_impl(args):
             print(f"  skip  '{name}': already registered "
                   f"(canonical: {canonical_path(existing[0])})")
             continue
-        rows.append(build_path_entry(p, upstream, getattr(args, "origin", "unknown")))
+        up = None
+        if upstream:  # default subpath: skills/<this skill's folder>, as discover records it
+            up = dict(upstream, subpath=upstream["subpath"]
+                      or f"skills/{os.path.basename(os.path.realpath(p))}")
+        rows.append(build_path_entry(p, up, getattr(args, "origin", "unknown")))
 
     print(f"skillctl register ({mode}) - {len(rows)} skill(s) to add")
     for e in rows:
@@ -1766,7 +1769,8 @@ def main(argv=None):
     sub.add_parser("audit", help="scan provider dirs and report drift vs registry")
 
     sp = sub.add_parser("sync", help="reconcile scan dirs to registry (plan by default)")
-    sp.add_argument("--plan", action="store_true", help="print actions only (default)")
+    sp.add_argument("--plan", dest="dry_run", action="store_true",
+                    help="print actions only (default); same as --dry-run, errors with --apply")
     sp.add_argument("--dry-run", action="store_true",
                     help="explicit no-change mode; same as default plan mode, errors if combined with --apply")
     sp.add_argument("--apply", action="store_true", help="execute the plan")
