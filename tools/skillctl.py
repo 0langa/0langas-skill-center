@@ -330,8 +330,8 @@ def nested_skills(path, depth=2):
     top = os.path.normpath(path)
     base = top.count(os.sep)
     for root, dirs, files in os.walk(top):
-        dirs.sort()
-        if root != top and "SKILL.md" in files:
+        dirs[:] = sorted(d for d in dirs if not is_link(os.path.join(root, d)))
+        if root != top and any(f.lower() == "skill.md" for f in files):
             found.append(os.path.relpath(root, top).replace(os.sep, "/"))
             dirs[:] = []  # a skill's subfolders are its own content
         elif root.count(os.sep) - base >= depth:
@@ -631,8 +631,8 @@ def build_plan(registry, archive_strays=False):
                 add_archive(e["path"], provider, "stray non-skill file in scan dir")
                 continue
             if e["fm"] is None:
-                if skill and skill.get("bundle"):
-                    continue
+                if skill is not None:
+                    continue  # owned: a bundle, or a canonical that lost SKILL.md
                 nested = nested_skills(e["path"])
                 if nested and not archive_strays:
                     # e.g. a cloned skills repo: archiving the folder would

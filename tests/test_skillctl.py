@@ -308,6 +308,22 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertEqual(sb.run("sync", "--apply", "--archive-strays").returncode, 0)
         self.assertFalse(sb.agents("skills").exists())
 
+    def test_owned_directory_without_skill_md_is_never_archived(self):
+        # a registered canonical that lost its SKILL.md (mid-rename, say)
+        sb = Sandbox(self)
+        sb.add_path_skill("beta")
+        sb.write_registry()
+        os.remove(sb.agents("beta") / "SKILL.md")
+        (sb.agents("beta") / "notes.md").write_text("user notes", encoding="utf-8")
+        write_skill(sb.agents("pack") / "inner", "inner")
+        (sb.agents("pack") / "inner" / "SKILL.md").rename(sb.agents("pack") / "inner" / "skill.md")
+
+        sb.run("sync", "--apply")
+        self.assertTrue((sb.agents("beta") / "notes.md").is_file())
+        self.assertTrue((sb.agents("pack") / "inner" / "skill.md").is_file(),
+                        "a pack of lowercase skill.md skills was archived")
+        self.assertEqual(sb.archived(), [])
+
     def test_archive_strays_moves_the_link_never_the_content_behind_it(self):
         sb = Sandbox(self)
         sb.write_registry()
