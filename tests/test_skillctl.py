@@ -65,7 +65,11 @@ def remove_tree(path):
                 except OSError:
                     os.unlink(p)
                 dirs.remove(d)
-    shutil.rmtree(path, ignore_errors=True)
+
+    def clear_readonly(func, p, _exc):  # git object files are read-only on Windows
+        os.chmod(p, stat.S_IWRITE)
+        func(p)
+    shutil.rmtree(path, onerror=clear_readonly)
 
 
 def make_junction(link, target):
