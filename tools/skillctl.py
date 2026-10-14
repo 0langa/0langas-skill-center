@@ -435,6 +435,39 @@ def remove_link(path, apply=False):
     raise RuntimeError(f"could not remove link {path}: {r.stdout} {r.stderr}")
 
 
+def linked_worktree_main():
+    """The main checkout's path when REPO_ROOT is a linked git worktree, else None."""
+    try:
+        r = subprocess.run(["git", "-C", str(REPO_ROOT), "rev-parse", "--git-dir",
+                            "--git-common-dir"], capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    lines = r.stdout.splitlines()
+    if r.returncode != 0 or len(lines) < 2:
+        return None
+    git_dir, common = (os.path.normpath(os.path.join(str(REPO_ROOT), x)) for x in lines[:2])
+    return None if norm(git_dir) == norm(common) else os.path.dirname(common)
+
+
+def refuse_in_linked_worktree(what):
+    """1 (after saying why) when `what` must not run from this checkout, else 0.
+
+    Repo-skill junctions point into the checkout skillctl runs from, and
+    _archive/ is gitignored there: from a linked worktree, both are lost
+    when `git worktree remove` deletes it - archived files included. A
+    sandbox SKILLCTL_HOME is allowed, since nothing real is linked then.
+    """
+    main = linked_worktree_main()
+    if main is None:
+        return 0
+    if os.environ.get("SKILLCTL_HOME") and norm(home_dir()) != norm(os.path.expanduser("~")):
+        return 0
+    print(f"refusing {what}: {REPO_ROOT} is a linked git worktree. Links made from it "
+          f"go dead and its _archive/ is deleted when the worktree is removed. "
+          f"Run it from the main checkout instead: {main}")
+    return 1
+
+
 def make_junction(link, target, apply=False):
     if apply:
         link, target = os.path.normpath(link), os.path.normpath(target)
@@ -804,6 +837,8 @@ def build_plan(registry, archive_strays=False):
 def cmd_sync(args):
     registry = load_registry()
     apply = args.apply
+    if apply and refuse_in_linked_worktree("sync --apply"):
+        return 1
     actions = build_plan(registry, archive_strays=getattr(args, "archive_strays", False))
     if getattr(args, "only", None):
         reg_by_name = {s["name"]: s for s in registry["skills"]}
@@ -1107,6 +1142,8 @@ def save_upstream_cache(cache):
 def cmd_update(args):
     registry = load_registry()
     apply = args.apply
+    if apply and refuse_in_linked_worktree("update --apply"):
+        return 1
     cache = load_upstream_cache()
     new_cache = dict(cache)
     mode = "APPLY" if apply else "PLAN"
@@ -1196,6 +1233,8 @@ def cmd_update(args):
 # --------------------------------------------------------------------------
 
 def cmd_archive(args):
+    if refuse_in_linked_worktree("archive"):
+        return 1
     src = os.path.abspath(expand_home(args.path))
     if not os.path.exists(src) and not is_link(src):
         # is_link catches dangling junctions/symlinks whose target is gone
@@ -1572,6 +1611,8 @@ def in_provider_dir(path, registry):
 def _cmd_unregister_impl(args):
     registry = load_registry()
     apply = args.apply
+    if apply and args.archive_canonical and refuse_in_linked_worktree("unregister --archive-canonical"):
+        return 1
     mode = "APPLY" if apply else "PLAN"
     rc = 0
     remaining = list(registry["skills"])

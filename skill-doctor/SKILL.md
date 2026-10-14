@@ -15,9 +15,10 @@ directory of this SKILL.md — when invoked through a junction/symlink, resolve
 the link target first. On Kimi Code `${KIMI_SKILL_DIR}` points at this skill's
 directory; other clients expose an equivalent variable or the invocation path.
 All commands below use `<repo>` for that root.
-If that root is a linked git worktree rather than the main checkout, stop
-before any `--apply` and ask: junctions would point at the worktree, and
-its `_archive/` is deleted with it.
+If that root is a linked git worktree rather than the main checkout,
+skillctl refuses `--apply` and `archive` there (junctions would point at
+the worktree, and its `_archive/` is deleted with it) and prints the main
+checkout's path: use that as `<repo>` instead.
 
 ## Provider layout facts (verified 2026-08-04)
 

@@ -598,6 +598,44 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertEqual(sb.run("unregister", "beta", "--apply").returncode, 0)
 
 
+@unittest.skipUnless(os.name == "nt" and shutil.which("git"), "needs git and mklink /J")
+class WorktreeGuardTest(unittest.TestCase):
+    """Real installs are never driven from a linked worktree."""
+
+    def test_mutating_commands_refuse_to_run_from_a_linked_worktree(self):
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.write_registry()
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid",
+               "-c", "core.autocrlf=false", "-C", str(sb.repo)]
+        for cmd in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "x"],
+                    ["worktree", "add", "-q", str(sb.root / "wt")]):
+            subprocess.run(git + cmd, check=True, capture_output=True)
+        # No SKILLCTL_HOME, so "the real home" is the decoy: a broken guard
+        # could only ever touch the decoy.
+        env = dict(os.environ, USERPROFILE=str(sb.decoy), HOME=str(sb.decoy),
+                   PYTHONIOENCODING="utf-8")
+        env.pop("SKILLCTL_HOME", None)
+
+        def skillctl(checkout, *args, **extra):
+            return subprocess.run([sys.executable, str(checkout / "tools" / "skillctl.py"), *args],
+                                  capture_output=True, text=True, encoding="utf-8",
+                                  env=dict(env, **extra))
+
+        wt = sb.root / "wt"
+        for args in (["sync", "--apply"], ["archive", str(sb.decoy / "anything")],
+                     ["update", "--apply"], ["unregister", "alpha", "--archive-canonical", "--apply"]):
+            r = skillctl(wt, *args)
+            self.assertEqual(r.returncode, 1, args)
+            self.assertIn("is a linked git worktree", r.stdout)
+            self.assertIn("Run it from the main checkout instead", r.stdout)
+        self.assertEqual(list(sb.decoy.iterdir()), [])
+        self.assertEqual(skillctl(wt, "sync", "--plan").returncode, 0, "plans stay allowed")
+        sandbox = sb.root / "sandbox-home"
+        self.assertEqual(skillctl(wt, "sync", "--apply", SKILLCTL_HOME=str(sandbox)).returncode, 0)
+        self.assertEqual(skillctl(sb.repo, "sync", "--apply").returncode, 0, "main checkout")
+
+
 class UpdateTest(unittest.TestCase):
     """update against a fake GitHub: git is stubbed, nothing leaves the machine."""
 
