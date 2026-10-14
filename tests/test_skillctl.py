@@ -427,6 +427,49 @@ class InstallAndRepairTest(unittest.TestCase):
         ci = sb.run("verify", "--ci")
         self.assertEqual(ci.returncode, 1, "verify --ci must refuse dir '' too")
 
+    def test_dir_values_never_reach_outside_the_skill_folder(self):
+        # "dir" names the folder inside a base install; anything but a single
+        # folder name pointed sync at the scan root or above it.
+        for value in ("", ".", "..", "sub/x", "C:/x"):
+            with self.subTest(dir=value):
+                sb = Sandbox(self)
+                sb.add_path_skill("beta")
+                sb.add_repo_skill("alpha")
+                sb.skills[-1].update({"dir": value, "install": {
+                    "codex": "agents", "kimi": "none", "claude": "none", "vscode": "none"}})
+                sb.write_registry()
+                r = sb.run("sync", "--apply")
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertEqual(sb.archived(), [])
+                self.assertTrue((sb.agents("beta") / "SKILL.md").is_file())
+                ci = sb.run("verify", "--ci")
+                self.assertIn("'alpha': 'dir' must be a single folder name", ci.stdout)
+
+    def test_a_location_owned_by_another_skill_is_refused(self):
+        # alpha's claude junction typed onto beta's agents folder: archiving
+        # "the occupant" would have evicted beta's canonical
+        sb = Sandbox(self)
+        sb.add_path_skill("beta")
+        sb.add_repo_skill("alpha")["install"]["kimi"] = "junction:~/.agents/skills/beta"
+        sb.write_registry()
+        r = sb.run("sync", "--apply")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("is claimed by both", r.stdout)
+        self.assertEqual(sb.archived(), [])
+        self.assertTrue((sb.agents("beta") / "SKILL.md").is_file())
+        self.assertFalse(is_link(sb.agents("beta")))
+
+    def test_a_scan_dir_or_container_is_never_a_location(self):
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")["install"]["codex"] = "junction:~/.agents/skills/skills"
+        sb.write_registry(containers={"~/.agents/skills/skills": "nested mirror"})
+        write_skill(sb.agents("skills") / "mirrored", "mirrored")
+        r = sb.run("sync", "--apply")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("is a scan directory or a container", r.stdout)
+        self.assertTrue((sb.agents("skills") / "mirrored" / "SKILL.md").is_file())
+        self.assertEqual(sb.archived(), [])
+
     def test_home_relative_paths_cannot_escape_the_home(self):
         sb = Sandbox(self)
         sb.add_repo_skill("alpha")["install"]["claude"] = "junction:~//.claude/skills/alpha"

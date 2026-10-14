@@ -260,18 +260,40 @@ def expected_locations(skill, provider):
     return []
 
 
+def dir_problem(skill):
+    """Why a skill's "dir" override is unusable, or None.
+
+    It names the skill's folder inside a base install, so it must be one
+    plain folder name: "", ".", "..", "a/b" or "C:/x" would put the
+    location at a scan root, above it, or somewhere else entirely.
+    """
+    if "dir" not in skill:
+        return None
+    d = skill["dir"]
+    if not isinstance(d, str) or d.strip() in ("", ".", "..") or re.search(r"[\/:]", d):
+        return f"'dir' must be a single folder name, not {d!r}"
+    return None
+
+
 def location_problem(registry, provider, loc):
     """Why `loc` cannot be an install location for provider, or None.
 
     It must sit directly inside a directory the provider scans (or a
-    declared container). Anything else - "junction:~", a scan root itself,
-    a "dir" of "" or ".." - would have sync archive whatever is there,
+    declared container), and must not itself be, or hold, any provider's
+    scan dir or container. Anything else - "junction:~", a scan root, a
+    "dir" of "" or ".." - would have sync archive whatever is there,
     possibly every installed skill, to make room for one link.
     """
+    loc = os.path.normpath(loc)
+    containers = {norm(expand_home(c)) for c in registry.get("containers", {})}
     roots = {norm(expand_home(s)) for s in registry["providers"][provider].get("scan", [])}
-    roots |= {norm(expand_home(c)) for c in registry.get("containers", {})}
-    if norm(os.path.dirname(os.path.normpath(loc))) not in roots:
-        return f"{os.path.normpath(loc)} is not directly inside a directory {provider} scans"
+    if norm(os.path.dirname(loc)) not in roots | containers:
+        return f"{loc} is not directly inside a directory {provider} scans"
+    every = containers | {norm(expand_home(s)) for conf in registry["providers"].values()
+                          for s in conf.get("scan", [])}
+    n = norm(loc)
+    if any(r == n or r.startswith(n + os.sep) for r in every):
+        return f"{loc} is a scan directory or a container, or holds one"
     return None
 
 
@@ -691,16 +713,22 @@ def build_plan(registry, archive_strays=False):
         target = canonical_target(skill)
         if resolved(loc) == target:
             return  # already the canonical, e.g. seen through a linked scan dir
-        if target.startswith(resolved(loc) + os.sep):
-            add_unfixable(skill, loc, provider,
-                          f"'{name}': {kind} path {loc} contains the canonical {canon}")
-            return
         if is_link(loc):
-            if link_target(loc) != canonical_target(skill):
-                add_link_action("relink", loc, canon, provider,
-                                f"wrong-target {kind} for '{name}'{note} "
-                                f"(now -> {os.path.realpath(loc)})")
+            # relink replaces the link itself, never what it points at
+            add_link_action("relink", loc, canon, provider,
+                            f"wrong-target {kind} for '{name}'{note} "
+                            f"(now -> {os.path.realpath(loc)})")
         elif os.path.lexists(loc):
+            # Never evict a folder that is, or holds, a registered canonical
+            # (an aliased scan dir, or a location typed onto another skill).
+            here = resolved(loc)
+            held = sorted(n for n, t in canonicals.items()
+                          if t == here or t.startswith(here + os.sep))
+            if held:
+                add_unfixable(skill, loc, provider,
+                              f"'{name}': {kind} path {loc} holds the canonical of "
+                              + ", ".join(f"'{n}'" for n in held))
+                return
             # mklink cannot replace an existing entry: move it out first
             what = "directory" if os.path.isdir(loc) else "file"
             add_archive(loc, provider, f"real {what} occupies {kind} path for '{name}'",
@@ -711,12 +739,24 @@ def build_plan(registry, archive_strays=False):
             add_link_action("junction", loc, canon, provider,
                             f"create missing {kind} for '{name}'{note}")
 
+    owners = {}  # norm(location) -> skill names claiming it, over all providers
+    for skill in registry["skills"]:
+        for provider in registry["providers"]:
+            for loc in expected_locations(skill, provider):
+                owners.setdefault(norm(loc), set()).add(skill["name"])
+    canonicals = {s["name"]: canonical_target(s) for s in registry["skills"]}
+
     for skill in registry["skills"]:
         canon = canonical_path(skill)
         for provider in registry["providers"]:
             inst = skill["install"].get(provider, "none")
             locs = expected_locations(skill, provider)
             problem = location_problem(registry, provider, locs[0]) if locs else None
+            if locs and inst in BASE_INSTALLS and dir_problem(skill):
+                problem = dir_problem(skill)
+            if locs and not problem and len(owners[norm(locs[0])]) > 1:
+                problem = (f"{os.path.normpath(locs[0])} is claimed by both "
+                           + " and ".join(f"'{n}'" for n in sorted(owners[norm(locs[0])])))
             if problem:
                 add_unfixable(skill, locs[0], provider, f"'{skill['name']}': {problem}")
             elif inst in BASE_INSTALLS:
@@ -882,6 +922,9 @@ def registry_failures(registry):
                 continue
             target = value.split(":", 1)[1] if isinstance(value, str) and ":" in value else ""
             if value in BASE_INSTALLS:
+                if dir_problem(s):
+                    failures.append(f"'{name}': {dir_problem(s)}")
+                    continue
                 loc = os.path.normpath(os.path.join(BASE_INSTALLS[value], skill_dir_name(s)))
             elif isinstance(value, str) and value.startswith(("junction:", "path:")) and target:
                 try:
@@ -899,6 +942,8 @@ def registry_failures(registry):
             if norm(parent) not in scan_dirs[provider] | containers:
                 failures.append(f"'{name}': [{provider}] {value} puts it in {parent}, "
                                 f"which {provider} does not scan")
+            elif location_problem(registry, provider, loc):
+                failures.append(f"'{name}': [{provider}] {location_problem(registry, provider, loc)}")
             owner = owners.setdefault(norm(loc), name)
             if owner != name:
                 failures.append(f"'{name}': [{provider}] {loc} is already claimed by '{owner}'")
