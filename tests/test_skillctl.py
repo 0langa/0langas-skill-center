@@ -433,8 +433,9 @@ class InstallAndRepairTest(unittest.TestCase):
 
     def test_dir_values_never_reach_outside_the_skill_folder(self):
         # "dir" names the folder inside a base install; anything but a single
-        # folder name pointed sync at the scan root or above it.
-        for value in ("", ".", "..", "sub/x", "C:/x"):
+        # folder name pointed sync at the scan root or above it. Windows drops
+        # trailing dots and spaces, so "..." and ". ." name the scan root too.
+        for value in ("", ".", "..", "sub/x", "sub\\x", "C:/x", "...", ". .", "x "):
             with self.subTest(dir=value):
                 sb = Sandbox(self)
                 sb.add_path_skill("beta")
@@ -473,6 +474,84 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertIn("is a scan directory or a container", r.stdout)
         self.assertTrue((sb.agents("skills") / "mirrored" / "SKILL.md").is_file())
         self.assertEqual(sb.archived(), [])
+
+    def test_a_location_windows_reads_as_the_scan_dir_is_refused(self):
+        # normpath() keeps "...", " " and ". ." as names, but Windows drops
+        # trailing dots and spaces: each of these is ~/.claude/skills itself,
+        # and sync archived the whole folder - unregistered skills included -
+        # to make room for one junction.
+        for value in ("junction:~/.claude/skills/...", "junction:~/.claude/skills/ ",
+                      "junction:~/.claude/skills/. ."):
+            with self.subTest(value=value):
+                sb = Sandbox(self)
+                sb.add_repo_skill("alpha")
+                sb.add_repo_skill("gamma")["install"]["claude"] = value
+                sb.write_registry()
+                make_junction(sb.claude("alpha"), sb.repo / "alpha")
+                write_skill(sb.claude("my-own"), "my-own")
+                r = sb.run("sync", "--apply")
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertIn("the folder name", r.stdout)
+                self.assertEqual(sb.archived(), [])
+                self.assertTrue((sb.claude("my-own") / "SKILL.md").is_file())
+                self.assertLinksTo(sb.claude("alpha"), sb.repo / "alpha")
+                ci = sb.run("verify", "--ci")
+                self.assertEqual(ci.returncode, 1, ci.stdout)
+                self.assertIn("'gamma': [claude]", ci.stdout)
+
+    def test_a_duplicate_that_is_a_registered_canonical_is_never_archived(self):
+        # kimi scans ~/.kimi-code/skills before ~/.agents/skills and sync kept
+        # the first copy of a name, archiving the canonical seen second as a
+        # "duplicate with conflicting target".
+        sb = Sandbox(self)  # a stale copy at beta's kimi location
+        sb.add_path_skill("beta")["install"]["kimi"] = "kimi"
+        write_skill(sb.home / ".kimi-code" / "skills" / "beta", "beta", "Stale copy.")
+        sb.write_registry()
+        r = sb.run("sync", "--apply")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("the canonical of 'beta'", r.stdout)
+        self.assertEqual(sb.archived(), [])
+        self.assertIn("Test skill.", (sb.agents("beta") / "SKILL.md").read_text(encoding="utf-8"))
+
+        sb = Sandbox(self)  # two registered skills whose SKILL.md share a name
+        write_skill(sb.home / ".kimi-code" / "skills" / "foo", "foo")
+        sb.skills.append({"name": "foo", "origin": "vendored",
+                          "canonical": {"type": "path", "path": "~/.kimi-code/skills/foo"},
+                          "upstream": None,
+                          "install": {"codex": "none", "kimi": "kimi", "claude": "none",
+                                      "vscode": "none"}})
+        sb.add_path_skill("foo-two")["install"].update({"kimi": "none", "claude": "none"})
+        write_skill(sb.agents("foo-two"), "foo")
+        sb.write_registry()
+        r = sb.run("sync", "--apply")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("the canonical of 'foo-two'", r.stdout)
+        self.assertEqual(sb.archived(), [])
+        self.assertTrue((sb.agents("foo-two") / "SKILL.md").is_file())
+
+    def test_a_scan_dir_linked_to_the_repo_or_the_home_is_never_cleaned_out(self):
+        # A scan dir that is a junction to the repo (to expose every repo
+        # skill at once) made .git, tools/ and the README "strays"; one linked
+        # to the home made every folder in it one.
+        sb = Sandbox(self)
+        sb.add_repo_skill("alpha")
+        sb.write_registry()
+        (sb.repo / ".git").mkdir()
+        (sb.repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+        (sb.repo / "README.md").write_text("readme", encoding="utf-8")
+        (sb.home / "Documents").mkdir()
+        (sb.home / "Documents" / "notes.txt").write_text("keep me", encoding="utf-8")
+        make_junction(sb.home / ".claude" / "skills", sb.repo)
+        make_junction(sb.home / ".copilot" / "skills", sb.home)
+
+        r = sb.run("sync", "--apply")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertEqual(sb.archived(), [])
+        for kept in (sb.repo / ".git" / "HEAD", sb.repo / "README.md",
+                     sb.repo / "tools" / "skillctl.py", sb.repo / "registry" / "skills.json",
+                     sb.home / "Documents" / "notes.txt"):
+            self.assertTrue(kept.is_file(), f"{kept} was moved")
+        self.assertLinksTo(sb.agents("alpha"), sb.repo / "alpha")
 
     def test_home_relative_paths_cannot_escape_the_home(self):
         sb = Sandbox(self)
@@ -583,6 +662,20 @@ class InstallAndRepairTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual([s["name"] for s in sb.registry()["skills"]], ["plugin-project"])
 
+        # a pack folder registered over skills registered inside it
+        write_skill(sb.agents("pack") / "inner", "inner")
+        sb.skills = [s for s in sb.registry()["skills"]]
+        sb.skills.append({"name": "pack", "origin": "vendored", "bundle": True,
+                          "canonical": {"type": "path", "path": "~/.agents/skills/pack"},
+                          "upstream": None, "install": {"codex": "agents", "kimi": "none",
+                                                        "claude": "none", "vscode": "none"}})
+        sb.add_path_skill("inner", create=False)["canonical"]["path"] = "~/.agents/skills/pack/inner"
+        sb.write_registry()
+        r = sb.run("unregister", "pack", "--archive-canonical", "--apply")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("the canonical of 'inner'", r.stdout)
+        self.assertTrue((sb.agents("pack") / "inner" / "SKILL.md").is_file())
+
     def test_register_upstream_without_subpath_records_the_skill_folder(self):
         sb = Sandbox(self)
         sb.write_registry()
@@ -663,10 +756,20 @@ class WorktreeGuardTest(unittest.TestCase):
             self.assertEqual(r.returncode, 1, args)
             self.assertIn("is a linked git worktree", r.stdout)
             self.assertIn("Run it from the main checkout instead", r.stdout)
+        # the real home under another spelling is not a sandbox
+        make_junction(sb.root / "jdecoy", sb.decoy)
+        for home in (sb.root / "jdecoy", str(sb.decoy).upper() + os.sep):
+            r = skillctl(wt, "sync", "--apply", SKILLCTL_HOME=str(home))
+            self.assertEqual(r.returncode, 1, (home, r.stdout))
+            self.assertIn("is a linked git worktree", r.stdout)
         self.assertEqual(list(sb.decoy.iterdir()), [])
         self.assertEqual(skillctl(wt, "sync", "--plan").returncode, 0, "plans stay allowed")
         sandbox = sb.root / "sandbox-home"
         self.assertEqual(skillctl(wt, "sync", "--apply", SKILLCTL_HOME=str(sandbox)).returncode, 0)
+        # the main checkout, also when reached through a junction
+        make_junction(sb.root / "jrepo", sb.repo)
+        r = skillctl(sb.root / "jrepo", "sync", "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout)
         self.assertEqual(skillctl(sb.repo, "sync", "--apply").returncode, 0, "main checkout")
 
 
@@ -727,6 +830,27 @@ class UpdateTest(unittest.TestCase):
         self.assertEqual(sb.archived(), ["upstream-beta"])
         old = next((sb.repo / "_archive").glob("2*/upstream-beta/SKILL.md"))
         self.assertIn("Test skill.", old.read_text(encoding="utf-8"))
+
+    def test_update_never_replaces_a_scan_dir_the_home_or_another_skill(self):
+        # update archives the canonical before copying upstream in: a typo
+        # such as "~/.agents/skills/" moved every installed skill.
+        for path in ("~/.agents/skills/", "~", "~/.agents/skills/beta/..", "~/.agents/skills/beta"):
+            with self.subTest(canonical=path):
+                sb = Sandbox(self)
+                sb.add_path_skill("beta")
+                entry = sb.add_path_skill("typo", create=False)
+                entry["canonical"]["path"] = path
+                entry["upstream"] = {"type": "github", "repo": "someone/skills",
+                                     "subpath": "skills/beta", "ref": "main"}
+                sb.write_registry()
+                rc, out = self.run_update(sb, self.upstream(sb, "Upstream v2."))
+                self.assertEqual(rc, 1, out)
+                self.assertIn("refusing to replace the canonical", out)
+                self.assertEqual(sb.archived(), [])
+                self.assertIn("Test skill.", (sb.agents("beta") / "SKILL.md").read_text(encoding="utf-8"))
+                if path != "~/.agents/skills/beta":  # verify --ci does not compare canonicals
+                    ci = sb.run("verify", "--ci")
+                    self.assertIn("'typo': canonical", ci.stdout)
 
     def test_unchanged_commit_still_restores_a_missing_canonical(self):
         sb = Sandbox(self)

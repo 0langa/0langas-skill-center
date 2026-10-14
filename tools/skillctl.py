@@ -260,17 +260,33 @@ def expected_locations(skill, provider):
     return []
 
 
+def name_problem(name):
+    """Why `name` is not one plain folder name on Windows, or None.
+
+    Windows drops trailing dots and spaces from the last part of a path, so
+    "...", ". ." or "x " name the folder above - a scan root, say - however
+    normpath() spells them; ":" names a drive or a data stream.
+    """
+    if name.strip() in ("", ".", ".."):
+        return "is empty, '.' or '..'"
+    if name != name.rstrip(". "):
+        return "ends in a dot or a space, which Windows drops"
+    if re.search(r'[\\/<>:"|?*]', name):
+        return "holds a path separator or a character Windows does not allow"
+    return None
+
+
 def dir_problem(skill):
     """Why a skill's "dir" override is unusable, or None.
 
     It names the skill's folder inside a base install, so it must be one
-    plain folder name: "", ".", "..", "a/b" or "C:/x" would put the
-    location at a scan root, above it, or somewhere else entirely.
+    plain folder name: "", ".", "..", "a/b", "a\\b", "C:/x" or "..." would
+    put the location at a scan root, above it, or somewhere else entirely.
     """
     if "dir" not in skill:
         return None
     d = skill["dir"]
-    if not isinstance(d, str) or d.strip() in ("", ".", "..") or re.search(r"[\/:]", d):
+    if not isinstance(d, str) or name_problem(d):
         return f"'dir' must be a single folder name, not {d!r}"
     return None
 
@@ -294,7 +310,72 @@ def location_problem(registry, provider, loc):
     n = norm(loc)
     if any(r == n or r.startswith(n + os.sep) for r in every):
         return f"{loc} is a scan directory or a container, or holds one"
+    why = name_problem(os.path.basename(loc))
+    if why:  # e.g. "junction:~/.claude/skills/..." - Windows reads it as the scan dir
+        return f"{loc}: the folder name {why}"
     return None
+
+
+def protected_paths(registry):
+    """[(kind, what, spelled, resolved)] for what skillctl must never move.
+
+    The home, every scan dir and container, this repo and every registered
+    canonical. Both forms are kept, so neither another spelling of a path
+    (case, an 8.3 name, the dots and spaces Windows drops) nor a junction in
+    the middle of it gets past protected_problem().
+    """
+    named = [("home", "the home directory", home_dir()), ("repo", "this repo", str(REPO_ROOT))]
+    named += [("scan", f"scan dir {s}", expand_home(s))
+              for conf in registry["providers"].values() for s in conf.get("scan", [])]
+    named += [("container", f"container {c}", expand_home(c))
+              for c in registry.get("containers") or {}]
+    for s in registry["skills"]:
+        try:
+            named.append(("canonical", f"the canonical of '{s['name']}'", canonical_path(s)))
+        except (KeyError, TypeError, ValueError):
+            continue  # a malformed or escaping row names no folder; verify --ci reports it
+    return [(kind, what, norm(os.path.abspath(p)), resolved(p)) for kind, what, p in named]
+
+
+def protected_problem(path, protected, replacing=None):
+    """Why moving `path` into _archive would take something protected along, or None.
+
+    Nothing that is, or holds, the home, a scan dir, a container, this repo
+    or a registered canonical is ever moved. A link is moved as the link
+    alone, so for one only its own spelling counts.
+
+    sync (replacing=None) also refuses a real path that a link in the middle
+    puts inside this repo or a canonical - a scan dir linked to the repo
+    would otherwise have its .git and tools/ archived as strays - or right
+    in the home, where nothing is a skill.
+
+    update and unregister pass replacing=<skill name>: that skill's own
+    canonical may be the path, but it must not hold anything else.
+    """
+    spelled, link = norm(os.path.abspath(path)), is_link(path)
+    here = None if link else resolved(path)
+    for kind, what, p_spelled, p_real in protected:
+        if replacing is not None and what == f"the canonical of '{replacing}'":
+            continue
+        if is_within(p_spelled, spelled):
+            return f"{path} is, or holds, {what}"
+        if link:
+            continue
+        if is_within(p_real, here):
+            return f"{path} is, or holds, {what} (as {here})"
+        if replacing is not None:
+            continue
+        if (kind in ("repo", "canonical") and is_within(here, p_real)
+                and not is_within(spelled, p_spelled)):
+            return f"{path} is {here}, inside {what}, through a link"
+        if kind == "home" and is_within(p_real, os.path.dirname(here)):
+            return f"{path} is {here}, right in the home directory or above it"
+    return None
+
+
+def is_within(child, parent):
+    """True if normalized path `child` is `parent` or below it (drive roots too)."""
+    return child == parent or child.startswith(parent.rstrip(os.sep) + os.sep)
 
 
 def scan_provider_dirs(registry):
@@ -460,7 +541,8 @@ def refuse_in_linked_worktree(what):
     main = linked_worktree_main()
     if main is None:
         return 0
-    if os.environ.get("SKILLCTL_HOME") and norm(home_dir()) != norm(os.path.expanduser("~")):
+    # resolved: a junction or an 8.3 spelling of the real home is not a sandbox
+    if os.environ.get("SKILLCTL_HOME") and resolved(home_dir()) != resolved(os.path.expanduser("~")):
         return 0
     print(f"refusing {what}: {REPO_ROOT} is a linked git worktree. Links made from it "
           f"go dead and its _archive/ is deleted when the worktree is removed. "
@@ -635,6 +717,7 @@ def build_plan(registry, archive_strays=False):
     """
     scan = scan_provider_dirs(registry)
     claimed = claimed_paths(registry)
+    protected = protected_paths(registry)
     actions = []
 
     # strays & duplicates from scan
@@ -643,6 +726,10 @@ def build_plan(registry, archive_strays=False):
     def add_archive(path, provider, reason, clears=False):
         """clears: a link repair needs this path empty, so the archive runs
         before the links are made and is never dropped as a conflict."""
+        problem = protected_problem(path, protected)
+        if problem:  # e.g. a duplicate that is another skill's canonical
+            add_unfixable(None, path, provider, f"not archived ({reason}): {problem}")
+            return
         key = norm(path)
         if key in archived:
             a = archived[key]
@@ -666,6 +753,22 @@ def build_plan(registry, archive_strays=False):
             return
         a = {"op": "review", "path": path, "provider": provider, "reason": reason}
         reviewed[key] = a
+        actions.append(a)
+
+    unfixable = {}  # (skill, canonical) -> action: one line however many providers
+
+    def add_unfixable(skill, canon, provider, reason=None):
+        """skill None: `canon` is a scan-dir path that must not be archived."""
+        key = (skill["name"] if skill else None, norm(canon), reason)
+        if key in unfixable:
+            if provider not in unfixable[key]["provider"].split(","):
+                unfixable[key]["provider"] += f",{provider}"
+            return
+        a = {"op": "unfixable", "provider": provider,
+             "reason": reason or f"'{skill['name']}' canonical missing at {canon}"}
+        if skill is None:
+            a["path"] = canon
+        unfixable[key] = a
         actions.append(a)
 
     for provider, entries in scan.items():
@@ -728,18 +831,6 @@ def build_plan(registry, archive_strays=False):
         linked[key] = a
         actions.append(a)
 
-    unfixable = {}  # (skill, canonical) -> action: one line however many providers
-
-    def add_unfixable(skill, canon, provider, reason=None):
-        key = (skill["name"], norm(canon), reason)
-        if key in unfixable:
-            unfixable[key]["provider"] += f",{provider}"
-            return
-        a = {"op": "unfixable", "provider": provider,
-             "reason": reason or f"'{skill['name']}' canonical missing at {canon}"}
-        unfixable[key] = a
-        actions.append(a)
-
     def plan_link(skill, loc, canon, provider, kind, note=""):
         """Plan whatever turns `loc` into a link to `canon`."""
         name = skill["name"]
@@ -752,15 +843,12 @@ def build_plan(registry, archive_strays=False):
                             f"wrong-target {kind} for '{name}'{note} "
                             f"(now -> {os.path.realpath(loc)})")
         elif os.path.lexists(loc):
-            # Never evict a folder that is, or holds, a registered canonical
-            # (an aliased scan dir, or a location typed onto another skill).
-            here = resolved(loc)
-            held = sorted(n for n, t in canonicals.items()
-                          if t == here or t.startswith(here + os.sep))
-            if held:
-                add_unfixable(skill, loc, provider,
-                              f"'{name}': {kind} path {loc} holds the canonical of "
-                              + ", ".join(f"'{n}'" for n in held))
+            # Never evict a folder that is, or holds, a registered canonical,
+            # a scan dir or the home (an aliased scan dir, a location typed
+            # onto another skill, or one Windows reads as its scan dir).
+            problem = protected_problem(loc, protected)
+            if problem:
+                add_unfixable(skill, loc, provider, f"'{name}': {kind} path {problem}")
                 return
             # mklink cannot replace an existing entry: move it out first
             what = "directory" if os.path.isdir(loc) else "file"
@@ -777,7 +865,6 @@ def build_plan(registry, archive_strays=False):
         for provider in registry["providers"]:
             for loc in expected_locations(skill, provider):
                 owners.setdefault(norm(loc), set()).add(skill["name"])
-    canonicals = {s["name"]: canonical_target(s) for s in registry["skills"]}
 
     for skill in registry["skills"]:
         canon = canonical_path(skill)
@@ -929,6 +1016,10 @@ def registry_failures(registry):
             scans = []
         scan_dirs[provider] = {norm(expand_home(s)) for s in scans}
     containers = {norm(expand_home(c)) for c in registry.get("containers", {})}
+    guarded = ([("the home directory", norm(os.path.abspath(home_dir()))),
+                ("this repo", norm(REPO_ROOT))]
+               + [("a scan dir or container", d)
+                  for d in sorted(set().union(*scan_dirs.values()) | containers)])
 
     names, owners = {}, {}
     for i, s in enumerate(skills):
@@ -946,6 +1037,17 @@ def registry_failures(registry):
             p = str(canon["path"])
             if os.path.isabs(p) or p.startswith("~") or ".." in re.split(r"[\\/]", p):
                 failures.append(f"'{name}': repo canonical '{p}' must be a path inside the repo")
+        if isinstance(canon, dict) and canon.get("type") in ("repo", "path") and canon.get("path"):
+            # update --apply archives the canonical before replacing it
+            try:
+                p = norm(os.path.abspath(canonical_path(s)))
+            except ValueError as exc:
+                failures.append(f"'{name}': canonical {exc}")
+            else:
+                held = [what for what, g in guarded if is_within(g, p)]
+                if held:
+                    failures.append(f"'{name}': canonical '{canon['path']}' is, or holds, "
+                                    f"{held[0]} - it must be one skill's own folder")
         install = s.get("install")
         if not isinstance(install, dict):
             failures.append(f"'{name}': 'install' must map providers to install methods")
@@ -1161,11 +1263,19 @@ def cmd_update(args):
     if apply:
         snap = make_snapshot("pre-update")
         print(f"  snapshot: {snap}")
+    protected = protected_paths(registry)
     for skill in targets:
         up = skill["upstream"]
         repo, subpath, ref = up["repo"], up["subpath"], up.get("ref", "main")
         url = f"https://github.com/{repo}"
         canon = canonical_path(skill)
+        # Replacing the canonical archives it first: a typo such as
+        # "~/.agents/skills/" or "~" would move every installed skill.
+        problem = protected_problem(canon, protected, replacing=skill["name"])
+        if problem:
+            rc = 1
+            print(f"  ERROR '{skill['name']}': refusing to replace the canonical: {problem}")
+            continue
         try:
             r = subprocess.run(["git", "ls-remote", url, ref],
                                capture_output=True, text=True, check=True, timeout=60)
@@ -1620,6 +1730,7 @@ def _cmd_unregister_impl(args):
     rc = 0
     remaining = list(registry["skills"])
     repo_root_norm = norm(str(REPO_ROOT)) + os.sep
+    protected = protected_paths(registry)
 
     print(f"skillctl unregister ({mode})")
     for name in args.names:
@@ -1648,6 +1759,13 @@ def _cmd_unregister_impl(args):
                     # e.g. usage-pulse, whose canonical is a whole project repo
                     print(f"  ERROR '{name}': canonical {cpath} is outside every provider "
                           f"scan dir; skillctl only archives skills that live in one. "
+                          f"Re-run without --archive-canonical for entry-only removal.")
+                    rc = 1
+                    continue
+                elif protected_problem(cpath, protected, replacing=name):
+                    # e.g. a container, or a folder holding other skills' canonicals
+                    print(f"  ERROR '{name}': refusing to archive the canonical: "
+                          f"{protected_problem(cpath, protected, replacing=name)}. "
                           f"Re-run without --archive-canonical for entry-only removal.")
                     rc = 1
                     continue
