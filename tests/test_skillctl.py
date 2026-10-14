@@ -1,9 +1,10 @@
 """Sandboxed tests for tools/skillctl.py.
 
-Every test copies skillctl.py into a throwaway repo and points SKILLCTL_HOME
-at a throwaway home. USERPROFILE and HOME point at a separate decoy directory,
-so a code path that ignored SKILLCTL_HOME would show up as a write to the
-decoy - never to the real ~/.agents, ~/.claude or ~/.kimi-code installs.
+Most tests copy skillctl.py into a throwaway repo and point SKILLCTL_HOME at
+a throwaway home; RepoInstallTest runs this repo's own skillctl against an
+empty one. USERPROFILE and HOME point at a separate decoy directory, so a
+code path that ignored SKILLCTL_HOME would show up as a write to the decoy -
+never to the real ~/.agents, ~/.claude or ~/.kimi-code installs.
 
 Run from the repo root:  python -m unittest discover -s tests -v
 """
