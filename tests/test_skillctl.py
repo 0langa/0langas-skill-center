@@ -440,6 +440,33 @@ class InstallAndRepairTest(unittest.TestCase):
         sb.run("register", str(sb.agents("newbie")), "--apply", home=jhome)
         self.assertEqual(len(sb.registry()["skills"]), 1)
 
+    def test_unregister_archives_only_canonicals_inside_a_provider_dir(self):
+        sb = Sandbox(self)
+        sb.add_path_skill("beta")
+        sb.add_path_skill("gone", create=False)
+        project = write_skill(sb.home / "source" / "repos" / "plugin-project", "plugin-project")
+        sb.skills.append({"name": "plugin-project", "origin": "mine",
+                          "canonical": {"type": "path", "path": "~/source/repos/plugin-project"},
+                          "upstream": None,
+                          "install": {"codex": "junction:~/.agents/skills/plugin-project",
+                                      "kimi": "none", "claude": "none", "vscode": "inherit"}})
+        sb.write_registry()
+
+        r = sb.run("unregister", "plugin-project", "--archive-canonical", "--apply")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertTrue((project / "SKILL.md").is_file(), "moved a project repo into _archive")
+        self.assertIn("plugin-project", [s["name"] for s in sb.registry()["skills"]])
+
+        r = sb.run("unregister", "beta", "--archive-canonical", "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertFalse(sb.agents("beta").exists())
+        self.assertEqual(sb.archived(), ["beta"])
+
+        # a canonical that is already gone used to crash the archive step
+        r = sb.run("unregister", "gone", "--archive-canonical", "--apply")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual([s["name"] for s in sb.registry()["skills"]], ["plugin-project"])
+
     def test_unregister_keeps_files_and_refuses_to_archive_repo_content(self):
         sb = Sandbox(self)
         sb.add_repo_skill("alpha")

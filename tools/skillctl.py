@@ -1478,6 +1478,14 @@ def cmd_discover(args):
 # unregister
 # --------------------------------------------------------------------------
 
+def in_provider_dir(path, registry):
+    """True if path lies inside a provider scan dir or a declared container."""
+    roots = [s for conf in registry["providers"].values() for s in conf.get("scan", [])]
+    roots += list(registry.get("containers", {}))
+    p = resolved(path)
+    return any(p.startswith(resolved(expand_home(r)) + os.sep) for r in roots)
+
+
 def _cmd_unregister_impl(args):
     registry = load_registry()
     apply = args.apply
@@ -1506,9 +1514,21 @@ def _cmd_unregister_impl(args):
                           f"for entry-only removal.")
                     rc = 1
                     continue
-                dest = archive_move(cpath, f"unregister --archive-canonical of '{name}'",
-                                    apply=apply)
-                print(f"  [{mode}] remove '{name}' from registry; archive canonical {cpath} -> {dest}")
+                if not os.path.lexists(cpath):
+                    print(f"  [{mode}] remove '{name}' from registry "
+                          f"(canonical {cpath} is already gone)")
+                elif not in_provider_dir(cpath, registry):
+                    # e.g. usage-pulse, whose canonical is a whole project repo
+                    print(f"  ERROR '{name}': canonical {cpath} is outside every provider "
+                          f"scan dir; skillctl only archives skills that live in one. "
+                          f"Re-run without --archive-canonical for entry-only removal.")
+                    rc = 1
+                    continue
+                else:
+                    dest = archive_move(cpath, f"unregister --archive-canonical of '{name}'",
+                                        apply=apply)
+                    print(f"  [{mode}] remove '{name}' from registry; "
+                          f"archive canonical {cpath} -> {dest}")
             else:
                 print(f"  [{mode}] remove '{name}' from registry (files left in place at {cpath})")
             remaining = [r for r in remaining if r is not s]
