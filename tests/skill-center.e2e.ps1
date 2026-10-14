@@ -47,6 +47,27 @@ function Read-JsonFile {
   }
 }
 
+# Like Read-JsonFile, but an eval file that parses to nothing ([] or null)
+# is a failure too: ConvertFrom-Json turns both into $null, which used to
+# skip every check that follows.
+function Read-EvalFile {
+  param([string]$Path)
+
+  $before = $Failures.Count
+  $json = Read-JsonFile $Path
+  if ($null -eq $json -and $Failures.Count -eq $before) {
+    Add-Failure "Eval file is empty or null: $Path"
+  }
+  return $json
+}
+
+# Number of real items in a JSON array property; @($x.evals).Count is 1 when
+# the property is missing.
+function Get-ItemCount {
+  param([object]$Items)
+  return @($Items | Where-Object { $null -ne $_ }).Count
+}
+
 function Get-FrontmatterMap {
   param([string]$Path)
 
@@ -201,12 +222,12 @@ foreach ($entry in $RepoSkills) {
     Add-Failure "Missing evals.json: $skill"
   }
   else {
-    $evalJson = Read-JsonFile $evalPath
+    $evalJson = Read-EvalFile $evalPath
     $EvalsBySkill[$skill] = $evalJson
     if ($null -ne $evalJson -and $evalJson.skill_name -ne $skill) {
       Add-Failure "evals.json skill_name mismatch: $skill"
     }
-    if ($null -ne $evalJson -and @($evalJson.evals).Count -lt 1) {
+    if ($null -ne $evalJson -and (Get-ItemCount $evalJson.evals) -lt 1) {
       Add-Failure "evals.json has no eval prompts: $skill"
     }
   }
@@ -216,7 +237,7 @@ foreach ($entry in $RepoSkills) {
     Add-Failure "Missing trigger-evals.json: $skill"
   }
   else {
-    $triggerJson = Read-JsonFile $triggerPath
+    $triggerJson = Read-EvalFile $triggerPath
     $TriggersBySkill[$skill] = $triggerJson
     if ($null -ne $triggerJson) {
       Test-TriggerEvalShape $skill $triggerJson
@@ -238,13 +259,14 @@ $RequiredFields = @("name", "description", "when_to_use", "type", "whenToUse", "
 $RepoSkillNames = @($RepoSkills | ForEach-Object { [string]$_.name })
 
 foreach ($skill in $WorkflowSkills) {
-  if ($RepoSkillNames -notcontains $skill) {
+  $entry = @($RepoSkills | Where-Object { [string]$_.name -eq $skill })[0]
+  if ($null -eq $entry) {
     Add-Failure "Workflow skill is not registered as a repo skill: $skill"
     continue
   }
-  $skillPath = Join-Path (Join-Path $RepoRoot $skill) "SKILL.md"
+  $skillPath = Join-Path (Join-Path $RepoRoot $entry.canonical.path) "SKILL.md"
   if (-not (Test-Path -LiteralPath $skillPath)) {
-    continue  # already reported above
+    continue  # reported as "Missing SKILL.md" by the per-skill loop above
   }
 
   $frontmatter = Get-FrontmatterMap $skillPath
@@ -262,7 +284,7 @@ foreach ($skill in $WorkflowSkills) {
     Add-Failure "Unexpected disableModelInvocation for ${skill}: $($frontmatter["disableModelInvocation"])"
   }
 
-  if ($null -ne $EvalsBySkill[$skill] -and @($EvalsBySkill[$skill].evals).Count -lt 3) {
+  if ($null -ne $EvalsBySkill[$skill] -and (Get-ItemCount $EvalsBySkill[$skill].evals) -lt 3) {
     Add-Failure "evals.json needs at least 3 eval prompts: $skill"
   }
 
