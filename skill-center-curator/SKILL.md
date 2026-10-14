@@ -17,7 +17,7 @@ After a skill-center task, the repo should have:
 
 - one canonical top-level directory per skill
 - tri-client frontmatter for Codex, Claude Code, and Kimi Code where appropriate
-- provider discovery links under `.codex/skills`, `.claude/skills`, and `.kimi-code/skills`
+- a `registry/skills.json` entry per skill, with user-level links in `~/.agents/skills` and `~/.claude/skills` created by `tools/skillctl.py sync`
 - trigger evals beside each skill
 - official docs evidence cached when provider behavior is claimed
 - README skill table updated
@@ -41,11 +41,10 @@ Use the other skills in this order:
 3. Run the orchestration order above.
 4. Update `README.md` skills table and remove completed candidates from the candidate list.
 5. Run deterministic checks:
-   - frontmatter has required fields
-   - provider links exist and resolve
-   - eval JSON parses
-   - README table contains the skill
-   - official docs cache exists when provider claims changed
+   - `python tools/skillctl.py verify --ci`: registry entry, frontmatter name, no unregistered skill folders
+   - `tests/skill-center.e2e.ps1`: frontmatter fields, eval JSON, README table; without `-CI` also that the user-level links resolve
+   - `python -m unittest discover -s tests` when `tools/skillctl.py` changed
+   - official docs cache updated when provider claims changed
 6. Summarize only material changes and verification results.
 
 ## Repository Policy

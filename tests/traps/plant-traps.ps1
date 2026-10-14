@@ -2,8 +2,14 @@
 # Idempotent: safe to re-run before each test round. See remove-traps.ps1 for cleanup.
 # Decoys use innocuous names on purpose. Never touches real skill CONTENT;
 # the one exception is the tri-client-skill-port claude JUNCTION (repointed; restored by remove-traps.ps1 or `skillctl sync --apply`).
+# Set SKILLCTL_HOME to plant into a sandbox home instead of the real one; tools/skillctl.py honours the same variable.
 $ErrorActionPreference = 'Stop'
-$A = "$HOME\.agents\skills"
+$UserHome = if ($env:SKILLCTL_HOME) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($env:SKILLCTL_HOME) } else { $HOME }
+$A = "$UserHome\.agents\skills"
+# Repo location is derived, never hardcoded: the repo has moved before and
+# hardcoded paths silently broke traps 12 and 13.
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$env:SKILLCTL_REGISTRY = Join-Path $RepoRoot 'registry\skills.json'
 
 function Write-Skill($dir, $fmName, $desc) {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -23,6 +29,14 @@ Decoy skill for acceptance testing.
   [System.IO.File]::WriteAllText((Join-Path $dir 'SKILL.md'), $body, (New-Object System.Text.UTF8Encoding($false)))
 }
 
+# Native commands do not honour $ErrorActionPreference, so check the exit code:
+# a trap that silently failed to plant makes the whole test round meaningless.
+function New-Junction($link, $target) {
+  New-Item -ItemType Directory -Force -Path (Split-Path $link) | Out-Null
+  cmd /c mklink /J "$link" "$target" | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "mklink /J failed: $link -> $target" }
+}
+
 # 1+2 registerable strays
 Write-Skill "$A\markdown-toolbox" 'markdown-toolbox' 'Utilities for linting and formatting Markdown files, fixing heading levels, tables, and link references.'
 Write-Skill "$A\pr-review-buddy" 'pr-review-buddy' 'Checklist-driven pull request review helper that summarizes diffs and drafts review comments.'
@@ -39,28 +53,28 @@ Write-Skill "$A\draft-formatter" 'draft-formatter' $null
 Write-Skill "$A\json-fixer" 'quick-json' 'Repair and reformat broken JSON documents.'
 # 8 broken junction
 if (Test-Path "$A\legacy-link") { cmd /c rmdir "$A\legacy-link" | Out-Null }
-cmd /c mklink /J "$A\legacy-link" "$A\_does-not-exist-anymore" | Out-Null
+New-Junction "$A\legacy-link" "$A\_does-not-exist-anymore"
 # 9 claude-scope stray
-Write-Skill "$HOME\.claude\skills\pdf-tools" 'pdf-tools' 'Merge, split, and extract text from PDF files.'
+Write-Skill "$UserHome\.claude\skills\pdf-tools" 'pdf-tools' 'Merge, split, and extract text from PDF files.'
 # 10 vscode-scope stray
-Write-Skill "$HOME\.copilot\skills\snippet-vault" 'snippet-vault' 'Store and retrieve reusable code snippets by language and tag.'
+Write-Skill "$UserHome\.copilot\skills\snippet-vault" 'snippet-vault' 'Store and retrieve reusable code snippets by language and tag.'
 # 11 duplicate-name decoy (registry skill pulse:usage-report, different target)
 Write-Skill "$A\usage-report" 'pulse:usage-report' 'Older copy of the usage report skill kept around after a manual sync experiment.'
 # 12 wrong-target junction on an expected registry location
-cmd /c rmdir "$HOME\.claude\skills\tri-client-skill-port" | Out-Null
-cmd /c mklink /J "$HOME\.claude\skills\tri-client-skill-port" "$HOME\source\repos\0langas-skill-center\muteman" | Out-Null
+if (Test-Path "$UserHome\.claude\skills\tri-client-skill-port") { cmd /c rmdir "$UserHome\.claude\skills\tri-client-skill-port" | Out-Null }
+New-Junction "$UserHome\.claude\skills\tri-client-skill-port" (Join-Path $RepoRoot "muteman")
 # 13 ghost registry entry
 python -c @"
 import json, os
-p = os.path.join(os.environ['HOME'] if 'HOME' in os.environ else os.path.expanduser('~'), 'source/repos/0langas-skill-center/registry/skills.json')
-p = p.replace('/', os.sep)
+p = os.environ['SKILLCTL_REGISTRY']
 r = json.load(open(p, encoding='utf-8'))
 if not any(s['name'] == 'ghost-ledger' for s in r['skills']):
-    r['skills'].append({'name': 'ghost-ledger', 'canonical': {'type': 'path', 'path': '~/.agents/skills/ghost-ledger'}, 'upstream': None, 'install': {'codex': 'agents', 'kimi': 'agents', 'claude': 'none', 'vscode': 'agents'}})
+    r['skills'].append({'name': 'ghost-ledger', 'origin': 'unknown', 'canonical': {'type': 'path', 'path': '~/.agents/skills/ghost-ledger'}, 'upstream': None, 'install': {'codex': 'agents', 'kimi': 'agents', 'claude': 'none', 'vscode': 'agents'}})
     tmp = p + '.tmp'
     json.dump(r, open(tmp, 'w', encoding='utf-8', newline='\n'), indent=2, ensure_ascii=False)
     open(tmp, 'a', encoding='utf-8', newline='\n').write('\n')
     os.replace(tmp, p)
 print('ghost-ledger planted')
 "@
-Write-Output 'trap suite planted (13 decoys)'
+if ($LASTEXITCODE -ne 0) { throw "planting the ghost registry entry failed" }
+Write-Output "trap suite planted (13 decoys) under $UserHome"

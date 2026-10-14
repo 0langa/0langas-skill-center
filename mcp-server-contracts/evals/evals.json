@@ -1,0 +1,29 @@
+{
+  "skill_name": "mcp-server-contracts",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Design the argument schema for a batch_edit tool.",
+      "expected_output": "Defines an explicit typed schema validated before any work, no implicit widening or auto-creation, a dry-run argument, documented preconditions and failure modes, and a typed error taxonomy.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Our README says the server is atomic and race-free.",
+      "expected_output": "Requires a suite behind each claim - public-corpus stress, race and interference coverage, and a killed-process fault matrix on both Windows and Linux - or the adjective is removed.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "The server works locally but the installed package cannot start.",
+      "expected_output": "Runs the package smoke that installs the built artifact the way a user does, checks the files allowlist, bin entry, module format and engines floor, and adds the smoke to the aggregate validate script.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Write a Python script to rename files in a folder.",
+      "expected_output": "Should NOT trigger; an ordinary scripting task with no MCP tool surface.",
+      "files": []
+    }
+  ]
+}

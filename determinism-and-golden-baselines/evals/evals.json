@@ -1,0 +1,29 @@
+{
+  "skill_name": "determinism-and-golden-baselines",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "test:gpu is red after my particle change. Run test:gpu:update so CI goes green.",
+      "expected_output": "Refuses a blind bless, verifies the affected modes visually on device, checks the moved-case count matches the change, then updates and justifies the bless with what changed and why the new output is correct.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "My new overlay reads Date.now() to animate. Is that a problem?",
+      "expected_output": "Yes - explains the determinism law, that everything time-dependent must resolve from track time through the shared chokepoints, and that this would diverge between preview and export.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Add an eighteenth visual mode and wire it into the app.",
+      "expected_output": "Adds one preset file plus registry entry, keeps it a pure function of (features, time, params), chooses a permanent preset ID, blesses new matrix cases after visual verification, and updates README, docs site, and the in-app guide.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Update the README badge URL.",
+      "expected_output": "Should NOT trigger; no rendered output or baseline is involved.",
+      "files": []
+    }
+  ]
+}

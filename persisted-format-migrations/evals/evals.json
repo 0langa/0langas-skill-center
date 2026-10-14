@@ -1,0 +1,29 @@
+{
+  "skill_name": "persisted-format-migrations",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add an is_archived flag to quarantined files in StorageMaster.",
+      "expected_output": "Adds a new V<N> migration level with the column and any needed index, chains it in the migrate path as one atomic transaction stamping its version, refuses to edit an existing level, and adds a fixture-based round-trip test.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I fixed a bug in migration V7 - can I just edit it?",
+      "expected_output": "No - explains that machines already at V7 never re-run it, producing two different schemas with the same version, and adds V8 instead.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "We are renaming the looks JSON format field palette to colors.",
+      "expected_output": "Bumps schemaVersion, adds a numbered pure migration mapping the old field, keeps a fixture for every shipped version, and tests the chain from the oldest supported version.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Explain how SQLite indexes work.",
+      "expected_output": "Should NOT trigger; a general database question with no persisted-format change in play.",
+      "files": []
+    }
+  ]
+}

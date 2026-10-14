@@ -1,0 +1,29 @@
+{
+  "skill_name": "windows-release-ritual",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Prepare and publish Beatform 2.104.0.",
+      "expected_output": "Runs the repo resumable release script rather than hand-stepping, confirms gates including device gates, verifies package.json, tauri.conf.json and Cargo.toml versions agree, writes CHANGELOG as user-facing notes, watches CI to green, verifies assets and checksums, and states the unsigned-binary status.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The GitHub release page shows the installer but the checksums file has uppercase hashes and the app rejects them.",
+      "expected_output": "Identifies the checksum casing normalization step in the release pipeline, fixes it, republishes the checksum asset, and re-verifies the in-app update against the previous version.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Which files carry the version number in StorageMaster?",
+      "expected_output": "Names Directory.Build.props with its version plus assembly, file and informational versions, and the installer script, and warns that a mismatched assembly version breaks update detection.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Push my current branch to origin.",
+      "expected_output": "Should NOT trigger a release ritual; no release step applies, and git mutation needs an explicit request anyway.",
+      "files": []
+    }
+  ]
+}

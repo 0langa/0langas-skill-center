@@ -1,0 +1,29 @@
+{
+  "skill_name": "autonomous-work-ledger",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Work through the next three backlog items in Beatform on your own.",
+      "expected_output": "Takes one item per cycle with a restated done-condition, runs the gates for each, updates BACKLOG.md and any docs the change affects in the same change, reports evidence, and stops before any git mutation.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "NEXT_STEPS.md says the agentheim tree is gutted - clean it up.",
+      "expected_output": "Verifies the dated claim against the repo first, finds it resolved, corrects the stale document, and does not act on the outdated warning.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I have to switch to Codex - hand this over.",
+      "expected_output": "Records repo and branch, what was done and verified with the exact commands, work in progress and its location, traps hit this session, and the next safe action.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Explain what a git worktree is.",
+      "expected_output": "Should NOT trigger; a general git question with no ongoing work pass.",
+      "files": []
+    }
+  ]
+}

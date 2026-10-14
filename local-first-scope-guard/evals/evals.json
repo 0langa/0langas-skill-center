@@ -1,0 +1,29 @@
+{
+  "skill_name": "local-first-scope-guard",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add optional cloud sync for project files - opt-in only.",
+      "expected_output": "Names the no-cloud invariant, declines to implement it as a default or an opt-in without an explicit product decision, and offers a local export and import path instead.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Should we cut 3.0 so the new mode lands as a major feature?",
+      "expected_output": "Points out that v3.0.0 is a quality bar rather than a milestone in this repo and keeps shipping the current major.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Write the release page copy for the downloader.",
+      "expected_output": "Keeps the user-responsibility notice, the no-DRM-bypass statement, the no-affiliation line, and the unsigned-binary caveat, without implying signing or store review.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Optimize the SQLite query for the folder tree.",
+      "expected_output": "Should NOT trigger; no product invariant, dependency, or legal surface is involved.",
+      "files": []
+    }
+  ]
+}

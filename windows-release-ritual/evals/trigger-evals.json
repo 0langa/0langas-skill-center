@@ -1,0 +1,44 @@
+[
+  {
+    "id": "T001",
+    "query": "Cut TubeForge v2.4.0 and get it published.",
+    "should_trigger": true,
+    "reason": "Direct release request for a Windows desktop app in this portfolio.",
+    "competing_skills": [],
+    "expected_routing": "Check for the repo release script first, confirm gates green, bump every version surface, write user-facing notes, watch CI, verify assets and checksums, test the upgrade path."
+  },
+  {
+    "id": "T002",
+    "query": "Write the changelog entry for the new Playlist DL version.",
+    "should_trigger": true,
+    "reason": "CHANGELOG in these apps is shipped user-facing text, not a commit log.",
+    "competing_skills": [],
+    "expected_routing": "Write release notes in user terms, no hashes or internal file names, and update the other version surfaces in the same change."
+  },
+  {
+    "id": "T003",
+    "query": "Users on 2.1.0 say the update button is greyed out.",
+    "should_trigger": true,
+    "reason": "Updater defect - the most common post-release failure mode here.",
+    "competing_skills": [],
+    "expected_routing": "Reproduce by installing the previous version and updating from it; check version surfaces, verification, progress streaming, installer handoff, rollback copy removal, and document the manual-install path in the notes."
+  },
+  {
+    "id": "T004",
+    "query": "The release workflow failed because Defender could not scan the artifact.",
+    "should_trigger": true,
+    "reason": "Release-pipeline failure; scan steps should degrade gracefully rather than fail a good release.",
+    "competing_skills": [],
+    "expected_routing": "Make verification cleanup retry instead of failing, keep the skipped scan visible in the log, then re-run and verify the published assets."
+  },
+  {
+    "id": "T005",
+    "query": "Add a new download preset to the queue settings.",
+    "should_trigger": false,
+    "reason": "Feature work with no version, changelog, or publish surface involved.",
+    "competing_skills": [
+      "autonomous-work-ledger"
+    ],
+    "expected_routing": "Do not trigger; this is normal feature work."
+  }
+]

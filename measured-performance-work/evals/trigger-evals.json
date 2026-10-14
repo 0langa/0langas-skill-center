@@ -1,0 +1,46 @@
+[
+  {
+    "id": "T001",
+    "query": "Scanning 400k files takes four minutes - make it faster.",
+    "should_trigger": true,
+    "reason": "Performance work requiring a baseline measurement before changes.",
+    "competing_skills": [],
+    "expected_routing": "Measure first, check per-file syscall count, thread-local metadata capture, and unindexed queries, then prove the win with before/after numbers and add a guard."
+  },
+  {
+    "id": "T002",
+    "query": "The UI freezes while the duplicate list loads.",
+    "should_trigger": true,
+    "reason": "Responsiveness symptom, usually work on the dispatcher thread.",
+    "competing_skills": [
+      "desktop-app-ux-polish"
+    ],
+    "expected_routing": "Measure the stall, move repository queries and badge computation off the UI thread, and add an assertion that fails if the work returns there."
+  },
+  {
+    "id": "T003",
+    "query": "I rewrote the path handling to be faster - review it.",
+    "should_trigger": true,
+    "reason": "Reviewing a perf claim requires numbers.",
+    "competing_skills": [],
+    "expected_routing": "Ask for the measurement command and before/after numbers; without them it is a refactor, not a perf change."
+  },
+  {
+    "id": "T004",
+    "query": "--threads does nothing in the turbo scanner.",
+    "should_trigger": true,
+    "reason": "Lost parallelism, a recurring shape in this portfolio.",
+    "competing_skills": [],
+    "expected_routing": "Check whether metadata is captured on the coordinator instead of the walker threads, fix it, and benchmark across thread counts."
+  },
+  {
+    "id": "T005",
+    "query": "Add a dark theme to the settings page.",
+    "should_trigger": false,
+    "reason": "UI work with no performance dimension.",
+    "competing_skills": [
+      "desktop-app-ux-polish"
+    ],
+    "expected_routing": "Do not trigger."
+  }
+]
